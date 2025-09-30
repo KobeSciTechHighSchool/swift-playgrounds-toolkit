@@ -231,91 +231,167 @@ const parseMap = (mapText) => {
   };
 };
 
-const mapCommandLine = (line) => line.replace(/\s+/g, '');
+const preprocessSolutionTokens = (solutionText) => {
+  return solutionText
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '')
+    .replace(/([{}])/g, '\n$1\n')
+    .split(/[\r\n]+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+};
 
 const parseCommands = (solutionText) => {
-  const lines = splitLines(solutionText);
-  if (!lines.length) {
+  const tokens = preprocessSolutionTokens(solutionText);
+  if (!tokens.length) {
     throw new Error('解答が空です。');
+  }
+
+  const functions = new Map();
+
+  const parseExecutableStatement = (currentIndex) => {
+    const token = tokens[currentIndex];
+    if (!token) {
+      throw new Error('命令の解析中に入力が終了しました。');
+    }
+
+    if (/^for\s+/i.test(token)) {
+      const loopMatch = token.match(/^for\s+(\d+)\s+times$/i);
+      if (!loopMatch) {
+        throw new Error(`for ループの構文を解析できません: ${token}`);
+      }
+
+      const iterations = Number.parseInt(loopMatch[1], 10);
+      if (!Number.isInteger(iterations) || iterations <= 0) {
+        throw new Error(`for ループの回数を正しく指定してください（現在: ${loopMatch[1]}）。`);
+      }
+
+      const { statements, nextIndex } = parseBlock(currentIndex + 1);
+      return {
+        statement: { kind: 'loop', count: iterations, body: statements },
+        nextIndex,
+      };
+    }
+
+    const normalized = token.replace(/\s+/g, '');
+
+    if (/^\w+\(\)$/u.test(normalized)) {
+      const base = normalized.replace(/\(.*\)$/u, '');
+      if (Object.values(Command).includes(base)) {
+        return {
+          statement: { kind: 'command', type: base },
+          nextIndex: currentIndex + 1,
+        };
+      }
+
+      return {
+        statement: { kind: 'call', name: base },
+        nextIndex: currentIndex + 1,
+      };
+    }
+
+    throw new Error(`未知の命令です: ${token}`);
+  };
+
+  const parseBlock = (startIndex) => {
+    if (tokens[startIndex] !== '{') {
+      throw new Error('開きカッコ { が必要です。');
+    }
+
+    const statements = [];
+    let index = startIndex + 1;
+
+    while (index < tokens.length && tokens[index] !== '}') {
+      const token = tokens[index];
+      if (/^func\s+/u.test(token)) {
+        throw new Error('関数を他の関数やループの内部で定義することはできません。');
+      }
+
+      const { statement, nextIndex } = parseExecutableStatement(index);
+      statements.push(statement);
+      index = nextIndex;
+    }
+
+    if (index >= tokens.length || tokens[index] !== '}') {
+      throw new Error('ブロックに対応する閉じカッコ } が見つかりません。');
+    }
+
+    return { statements, nextIndex: index + 1 };
+  };
+
+  const parseFunctionDefinition = (currentIndex) => {
+    const token = tokens[currentIndex];
+    const match = token.match(/^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)$/u);
+    if (!match) {
+      throw new Error(`関数定義の構文を解析できません: ${token}`);
+    }
+
+    const name = match[1];
+    if (Object.values(Command).includes(name)) {
+      throw new Error(`命令と同じ名前の関数は定義できません: ${name}`);
+    }
+
+    if (functions.has(name)) {
+      throw new Error(`関数 ${name} はすでに定義されています。`);
+    }
+
+    const { statements, nextIndex } = parseBlock(currentIndex + 1);
+    functions.set(name, statements);
+    return nextIndex;
+  };
+
+  const mainStatements = [];
+  let cursor = 0;
+
+  while (cursor < tokens.length) {
+    const token = tokens[cursor];
+
+    if (/^func\s+/u.test(token)) {
+      cursor = parseFunctionDefinition(cursor);
+      continue;
+    }
+
+    const { statement, nextIndex } = parseExecutableStatement(cursor);
+    mainStatements.push(statement);
+    cursor = nextIndex;
+  }
+
+  if (!mainStatements.length) {
+    throw new Error('実行する命令が見つかりません。');
   }
 
   const commands = [];
 
-  const normalizeCommand = (instruction) => {
-    const signature = instruction.replace(/\s+/g, '');
-    const base = signature.replace(/\(.*\)/, '');
-    if (!Object.values(Command).includes(base)) {
-      throw new Error(`未知の命令です: ${instruction}`);
-    }
-    return base;
-  };
-
-  const parseLoopBlock = (count, blockLines) => {
-    const iterations = Number.parseInt(count, 10);
-    if (!Number.isInteger(iterations) || iterations <= 0) {
-      throw new Error(`for ループの回数を正しく指定してください（現在: ${count}）。`);
-    }
-
-    const innerCommands = blockLines.map((line) => {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) {
-        return null;
-      }
-      if (trimmedLine.startsWith('for ')) {
-        throw new Error('for ループの入れ子は現在サポートされていません。');
-      }
-      const type = normalizeCommand(mapCommandLine(trimmedLine));
-      return { type };
-    }).filter(Boolean);
-
-    for (let iteration = 0; iteration < iterations; iteration += 1) {
-      innerCommands.forEach((command) => commands.push({ ...command }));
-    }
-  };
-
-  let index = 0;
-  while (index < lines.length) {
-    const rawLine = lines[index];
-    const trimmed = rawLine.trim();
-
-    if (trimmed.startsWith('for ')) {
-      const loopMatch = trimmed.match(/for\s+(\d+)\s+times\s*\{/i);
-      if (!loopMatch) {
-        throw new Error(`for ループの構文を解析できません: ${rawLine}`);
+  const expandStatements = (statements, callStack = []) => {
+    statements.forEach((statement) => {
+      if (statement.kind === 'command') {
+        commands.push({ type: statement.type });
+        return;
       }
 
-      const [, count] = loopMatch;
-      const blockLines = [];
-      index += 1;
-      let depth = 1;
-
-      while (index < lines.length && depth > 0) {
-        const line = lines[index].trim();
-        if (line === '}') {
-          depth -= 1;
-          if (depth === 0) {
-            index += 1;
-            break;
-          }
-        } else {
-          blockLines.push(lines[index]);
-          index += 1;
+      if (statement.kind === 'loop') {
+        for (let iteration = 0; iteration < statement.count; iteration += 1) {
+          expandStatements(statement.body, callStack);
         }
+        return;
       }
 
-      if (depth !== 0) {
-        throw new Error('for ループに対応する閉じカッコが見つかりません。');
+      if (statement.kind === 'call') {
+        if (!functions.has(statement.name)) {
+          throw new Error(`未定義の関数を呼び出しています: ${statement.name}()`);
+        }
+
+        if (callStack.includes(statement.name)) {
+          throw new Error(`再帰的な関数呼び出しはサポートされていません: ${statement.name}()`);
+        }
+
+        const nextStack = [...callStack, statement.name];
+        expandStatements(functions.get(statement.name), nextStack);
       }
+    });
+  };
 
-      parseLoopBlock(count, blockLines);
-      continue;
-    }
-
-    const instruction = mapCommandLine(trimmed);
-    const type = normalizeCommand(instruction);
-    commands.push({ type });
-    index += 1;
-  }
+  expandStatements(mainStatements);
 
   return commands;
 };
