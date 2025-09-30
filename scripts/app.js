@@ -232,9 +232,21 @@ const parseMap = (mapText) => {
 };
 
 const preprocessSolutionTokens = (solutionText) => {
-  return solutionText
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/.*$/gm, '')
+  const withoutBlockComments = solutionText.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  const cleanedLines = withoutBlockComments
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\ufeff/g, ''))
+    .map((line) => {
+      const trimmedStart = line.trimStart();
+      if (trimmedStart.startsWith('//')) {
+        return '';
+      }
+      return line.replace(/\/\/.*$/u, '');
+    });
+
+  return cleanedLines
+    .join('\n')
     .replace(/([{}])/g, '\n$1\n')
     .split(/[\r\n]+/)
     .map((line) => line.trim())
