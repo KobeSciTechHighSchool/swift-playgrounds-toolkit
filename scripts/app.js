@@ -87,8 +87,8 @@ const statusLabels = {
 
 const summaryMessages = {
   idle: 'マップとコードを入力し、下の「検証を実行」を押してください。',
-  success: '模範解答はマップ上で正常に実行されました。',
-  failure: '模範解答に問題があります。詳細を確認してください。',
+  success: '解答はマップ上で正常に実行されました。',
+  failure: '解答に問題があります。詳細を確認してください。',
   error: '解析時にエラーが発生しました。入力内容をご確認ください。',
 };
 
@@ -236,7 +236,7 @@ const mapCommandLine = (line) => line.replace(/\s+/g, '');
 const parseCommands = (solutionText) => {
   const lines = splitLines(solutionText);
   if (!lines.length) {
-    throw new Error('模範解答が空です。');
+    throw new Error('解答が空です。');
   }
 
   const commands = [];
