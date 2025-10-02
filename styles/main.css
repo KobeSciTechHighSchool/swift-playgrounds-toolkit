@@ -372,6 +372,58 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
+.stepper-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.stepper-status {
+  display: grid;
+  gap: 6px;
+}
+
+.stepper-status strong {
+  font-size: 1.05rem;
+}
+
+.stepper-detail {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.stepper-readout {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.stepper-readout dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.stepper-readout dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.stepper-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stepper-controls .btn {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+
 .map-card header,
 .log-card header {
   display: flex;
@@ -446,6 +498,30 @@ textarea:focus {
 .map-cell[data-path="true"] {
   outline: 2px dashed rgba(108, 123, 255, 0.42);
   background: rgba(108, 123, 255, 0.22);
+}
+
+.map-cell[data-active="true"] {
+  border: 2px solid rgba(124, 140, 255, 0.75);
+  box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22), 0 12px 28px rgba(108, 123, 255, 0.22);
+  background: rgba(124, 140, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.map-cell[data-active="true"]::before {
+  content: attr(data-actor);
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #6c7bff, #8895ff);
+  color: var(--text-inverse);
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(108, 123, 255, 0.25);
 }
 
 .log-card {

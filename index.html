@@ -107,6 +107,41 @@
         </section>
       </form>
 
+      <section class="card stepper-card" id="stepperCard" aria-live="polite">
+        <header>
+          <div>
+            <h2>ステップ実行</h2>
+            <p class="description">1 コマンドずつ現在地を追跡しながらシミュレーションを確認できます。</p>
+          </div>
+            <span class="chip" id="stepCounterChip">0 コマンド</span>
+        </header>
+        <div class="stepper-status">
+          <strong id="stepStatusHeading">結果待機中</strong>
+          <p id="stepStatusMessage">「検証を実行」を押すとステップ実行が有効になります。</p>
+          <p id="stepDetailMessage" class="stepper-detail">ステップごとのメッセージがここに表示されます。</p>
+        </div>
+        <dl class="stepper-readout">
+          <div>
+            <dt>ステップ</dt>
+            <dd id="stepIndexLabel">--</dd>
+          </div>
+          <div>
+            <dt>位置</dt>
+            <dd id="stepPositionLabel">--</dd>
+          </div>
+          <div>
+            <dt>向き</dt>
+            <dd id="stepFacingLabel">--</dd>
+          </div>
+        </dl>
+        <div class="stepper-controls">
+          <button type="button" class="btn subtle" id="stepStartButton">最初から</button>
+          <button type="button" class="btn ghost" id="stepPrevButton">前へ</button>
+          <button type="button" class="btn primary" id="stepNextButton">次へ</button>
+          <button type="button" class="btn ghost" id="stepAutoButton">自動再生</button>
+        </div>
+      </section>
+
       <section class="card map-card" aria-live="polite">
         <header>
           <h2>マッププレビュー</h2>

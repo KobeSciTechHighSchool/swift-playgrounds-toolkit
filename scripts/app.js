@@ -21,6 +21,18 @@ const collapseLogButton = document.querySelector('#collapseLogButton');
 const loadSampleButton = document.querySelector('#loadSampleButton');
 const clearInputsButton = document.querySelector('#clearInputsButton');
 const previewNote = document.querySelector('#previewNote');
+const stepperCard = document.querySelector('#stepperCard');
+const stepCounterChip = document.querySelector('#stepCounterChip');
+const stepStatusHeading = document.querySelector('#stepStatusHeading');
+const stepStatusMessage = document.querySelector('#stepStatusMessage');
+const stepDetailMessage = document.querySelector('#stepDetailMessage');
+const stepIndexLabel = document.querySelector('#stepIndexLabel');
+const stepPositionLabel = document.querySelector('#stepPositionLabel');
+const stepFacingLabel = document.querySelector('#stepFacingLabel');
+const stepStartButton = document.querySelector('#stepStartButton');
+const stepPrevButton = document.querySelector('#stepPrevButton');
+const stepNextButton = document.querySelector('#stepNextButton');
+const stepAutoButton = document.querySelector('#stepAutoButton');
 
 const legend = {
   stop: '止',
@@ -296,6 +308,20 @@ const startArrowToDirection = {
   [legend.arrows[3]]: 'right',
 };
 
+const directionToArrow = {
+  up: legend.arrows[0],
+  down: legend.arrows[1],
+  left: legend.arrows[2],
+  right: legend.arrows[3],
+};
+
+const directionLabels = {
+  up: '上',
+  down: '下',
+  left: '左',
+  right: '右',
+};
+
 const statusLabels = {
   idle: '未検証',
   success: '成功',
@@ -316,6 +342,10 @@ const detailMessages = {
   failure: '不足しているアクションやマップ上の不整合を確認し、解答を調整してください。',
   error: 'タブ区切りの形式や正しい命令で構成されているかチェックしてください。',
 };
+
+const DEFAULT_STEPPER_HINT = '「検証を実行」を押すとステップ実行が有効になります。';
+const DEFAULT_STEPPER_DETAIL = 'ステップごとのメッセージがここに表示されます。';
+const STEP_AUTO_INTERVAL = 700;
 
 const formatTimestamp = () => {
   return new Intl.DateTimeFormat('ja-JP', {
@@ -841,6 +871,7 @@ const simulateProgram = (mapData, program) => {
   const logEntries = [];
   const errors = [];
   const visitedPath = new Set();
+  const frames = [];
   let gemsCollected = 0;
   const remainingGems = new Set(mapData.gems);
   const switchesState = new Map(mapData.switches);
@@ -854,22 +885,46 @@ const simulateProgram = (mapData, program) => {
 
   const functions = program.functions ?? new Map();
 
-  const recordLog = (message, kind = 'info') => {
-    logEntries.push({ message, kind, position: { row: currentRow, col: currentCol }, facing });
+  const captureFrame = ({ message = '', kind = 'info', label = null, command = null } = {}) => {
+    frames.push({
+      frameIndex: frames.length,
+      step: executedCommands,
+      row: currentRow,
+      col: currentCol,
+      facing,
+      visited: Array.from(visitedPath),
+      message,
+      kind,
+      label,
+      command,
+    });
   };
 
-  const recordError = (message) => {
+  const recordLog = (message, kind = 'info', options = {}) => {
+    const entry = { message, kind, position: { row: currentRow, col: currentCol }, facing };
+    logEntries.push(entry);
+    if (options.capture) {
+      captureFrame({
+        message,
+        kind,
+        label: options.label ?? null,
+        command: options.command ?? null,
+      });
+    }
+  };
+
+  const recordError = (message, meta = {}) => {
     errors.push(message);
-    recordLog(message, 'error');
+    recordLog(message, 'error', { capture: true, ...meta });
   };
 
-  const ensureBudget = () => {
+  const ensureBudget = (meta = {}) => {
     if (halted) {
       return false;
     }
     operationCount += 1;
     if (operationCount > MAX_EXECUTION_STEPS) {
-      recordError(`実行ステップが ${MAX_EXECUTION_STEPS} 回を超えました。無限ループの可能性があります。`);
+      recordError(`実行ステップが ${MAX_EXECUTION_STEPS} 回を超えました。無限ループの可能性があります。`, meta);
       halted = true;
       return false;
     }
@@ -921,7 +976,8 @@ const simulateProgram = (mapData, program) => {
       return;
     }
 
-    if (!ensureBudget()) {
+    const commandMeta = { label: `コマンド ${executedCommands + 1}`, command: type };
+    if (!ensureBudget(commandMeta)) {
       return;
     }
 
@@ -937,13 +993,13 @@ const simulateProgram = (mapData, program) => {
       const targetCell = getCell(mapData.grid, targetRow, targetCol);
 
       if (!targetCell) {
-        recordError(`コマンド ${humanIndex}: マップの外に移動しようとしました。`);
+        recordError(`コマンド ${humanIndex}: マップの外に移動しようとしました。`, commandMeta);
         halted = true;
         return;
       }
 
       if (targetCell.type === 'wall') {
-        recordError(`コマンド ${humanIndex}: 通行不可のマス(止) に衝突しました。`);
+        recordError(`コマンド ${humanIndex}: 通行不可のマス(止) に衝突しました。`, commandMeta);
         halted = true;
         return;
       }
@@ -951,19 +1007,26 @@ const simulateProgram = (mapData, program) => {
       currentRow = targetRow;
       currentCol = targetCol;
       visitedPath.add(`${currentRow},${currentCol}`);
-      recordLog(`コマンド ${humanIndex}: (${currentRow + 1}, ${currentCol + 1}) に移動しました。`);
+      recordLog(`コマンド ${humanIndex}: (${currentRow + 1}, ${currentCol + 1}) に移動しました。`, 'info', {
+        capture: true,
+        ...commandMeta,
+      });
 
       if (targetCell.warpId) {
         const destination = resolveWarp(mapData.portals, targetCell.warpId, targetCell);
         if (!destination) {
-          recordError(`コマンド ${humanIndex}: ワープ W${targetCell.warpId} の遷移先が見つかりません。`);
+          recordError(`コマンド ${humanIndex}: ワープ W${targetCell.warpId} の遷移先が見つかりません。`, commandMeta);
           halted = true;
           return;
         }
         currentRow = destination.row;
         currentCol = destination.col;
         visitedPath.add(`${currentRow},${currentCol}`);
-        recordLog(`ワープ W${targetCell.warpId} を通過し、(${currentRow + 1}, ${currentCol + 1}) に移動しました。`, 'success');
+        recordLog(`ワープ W${targetCell.warpId} を通過し、(${currentRow + 1}, ${currentCol + 1}) に移動しました。`, 'success', {
+          capture: true,
+          label: `ワープ W${targetCell.warpId}`,
+          command: 'warp',
+        });
       }
 
       return;
@@ -972,34 +1035,43 @@ const simulateProgram = (mapData, program) => {
     if (type === Command.TURN_LEFT || type === Command.TURN_RIGHT) {
       const turnDirection = type === Command.TURN_LEFT ? 'left' : 'right';
       facing = rotateDirection(facing, turnDirection);
-      recordLog(`コマンド ${humanIndex}: ${turnDirection === 'left' ? '左' : '右'}へ回転し、向きは ${facing} になりました。`);
+      recordLog(`コマンド ${humanIndex}: ${turnDirection === 'left' ? '左' : '右'}へ回転し、向きは ${facing} になりました。`, 'info', {
+        capture: true,
+        ...commandMeta,
+      });
       return;
     }
 
     if (type === Command.COLLECT_GEM) {
       const gemKey = `${currentRow},${currentCol}`;
       if (!remainingGems.has(gemKey)) {
-        recordError(`コマンド ${humanIndex}: 床にジェムが存在しません。`);
+        recordError(`コマンド ${humanIndex}: 床にジェムが存在しません。`, commandMeta);
         halted = true;
         return;
       }
       remainingGems.delete(gemKey);
       gemsCollected += 1;
-      recordLog(`コマンド ${humanIndex}: ジェムを回収しました (合計 ${gemsCollected})。`, 'success');
+      recordLog(`コマンド ${humanIndex}: ジェムを回収しました (合計 ${gemsCollected})。`, 'success', {
+        capture: true,
+        ...commandMeta,
+      });
       return;
     }
 
     if (type === Command.TOGGLE_SWITCH) {
       const switchKey = `${currentRow},${currentCol}`;
       if (!switchesState.has(switchKey)) {
-        recordError(`コマンド ${humanIndex}: スイッチが存在しません。`);
+        recordError(`コマンド ${humanIndex}: スイッチが存在しません。`, commandMeta);
         halted = true;
         return;
       }
       const currentState = switchesState.get(switchKey);
       const nextState = currentState === 'open' ? 'closed' : 'open';
       switchesState.set(switchKey, nextState);
-      recordLog(`コマンド ${humanIndex}: スイッチを ${nextState === 'open' ? '開けました' : '閉じました'}。`, 'info');
+      recordLog(`コマンド ${humanIndex}: スイッチを ${nextState === 'open' ? '開けました' : '閉じました'}。`, 'info', {
+        capture: true,
+        ...commandMeta,
+      });
       return;
     }
   };
@@ -1086,8 +1158,20 @@ const simulateProgram = (mapData, program) => {
   };
 
   visitedPath.add(`${currentRow},${currentCol}`);
-  recordLog(`スタート位置 (${currentRow + 1}, ${currentCol + 1}) から ${facing} 向きで開始します。`, 'success');
+  recordLog(`スタート位置 (${currentRow + 1}, ${currentCol + 1}) から ${facing} 向きで開始します。`, 'success', {
+    capture: true,
+    label: '開始',
+    command: 'start',
+  });
   executeStatements(program.main ?? []);
+
+  if (!halted) {
+    recordLog('すべてのコマンドを実行しました。', 'success', {
+      capture: true,
+      label: '完了',
+      command: 'end',
+    });
+  }
 
   const unresolvedSwitches = Array.from(switchesState.values()).filter((state) => state !== 'open').length;
   const openSwitches = switchesState.size - unresolvedSwitches;
@@ -1109,13 +1193,16 @@ const simulateProgram = (mapData, program) => {
     switchesOpen: openSwitches,
     totalSwitches: mapData.switches.size,
     stepsExecuted: executedCommands,
+    frames,
   };
 };
 
-const renderMapPreview = (mapData, visitedPath = new Set()) => {
+const renderMapPreview = (mapData, visitedPath = new Set(), activePosition = null) => {
   if (!mapCanvas) return;
   mapCanvas.textContent = '';
   mapCanvas.style.setProperty('--cols', String(mapData.columns));
+
+  const visitedSet = visitedPath instanceof Set ? visitedPath : new Set(visitedPath ?? []);
 
   mapData.grid.forEach((row) => {
     row.forEach((cell) => {
@@ -1140,8 +1227,25 @@ const renderMapPreview = (mapData, visitedPath = new Set()) => {
       }
 
       const key = `${cell.row},${cell.col}`;
-      if (visitedPath.has(key)) {
+      if (visitedSet.has(key)) {
         cellElement.dataset.path = 'true';
+      }
+
+      const isActive = Boolean(
+        activePosition && cell.row === activePosition.row && cell.col === activePosition.col,
+      );
+
+      if (isActive) {
+        cellElement.dataset.active = 'true';
+        const actorSymbol = activePosition.facing ? directionToArrow[activePosition.facing] ?? '' : '';
+        if (actorSymbol) {
+          cellElement.dataset.actor = actorSymbol;
+        } else {
+          delete cellElement.dataset.actor;
+        }
+      } else {
+        delete cellElement.dataset.active;
+        delete cellElement.dataset.actor;
       }
 
       mapCanvas.appendChild(cellElement);
@@ -1218,7 +1322,181 @@ const setCommandCount = (program) => {
   commandCountChip.textContent = hasDynamicControlFlow ? '可変（条件分岐あり）' : '— コマンド';
 };
 
+const stepperState = {
+  frames: [],
+  index: -1,
+  mapData: null,
+  autoTimer: null,
+  hasErrors: false,
+  defaultMessage: DEFAULT_STEPPER_HINT,
+  commandTotal: 0,
+};
+
+const formatFacing = (direction) => {
+  if (!direction) {
+    return '--';
+  }
+  const label = directionLabels[direction] ?? direction;
+  const arrow = directionToArrow[direction] ?? '';
+  return arrow ? `${label} (${arrow})` : label;
+};
+
+const stopAutoPlay = () => {
+  if (stepperState.autoTimer) {
+    window.clearInterval(stepperState.autoTimer);
+    stepperState.autoTimer = null;
+  }
+};
+
+const updateStepperUI = () => {
+  if (!stepperCard) {
+    return;
+  }
+
+  const totalFrames = stepperState.frames.length;
+  const isAuto = Boolean(stepperState.autoTimer);
+
+  const commandLabel = stepperState.commandTotal > 0 ? `${stepperState.commandTotal} コマンド` : '0 コマンド';
+  stepCounterChip.textContent = commandLabel;
+
+  if (totalFrames === 0) {
+    stepStatusHeading.textContent = '結果待機中';
+    stepStatusMessage.textContent = stepperState.defaultMessage;
+    stepDetailMessage.textContent = DEFAULT_STEPPER_DETAIL;
+    stepIndexLabel.textContent = '--';
+    stepPositionLabel.textContent = '--';
+    stepFacingLabel.textContent = '--';
+    if (stepStartButton) stepStartButton.disabled = true;
+    if (stepPrevButton) stepPrevButton.disabled = true;
+    if (stepNextButton) stepNextButton.disabled = true;
+    if (stepAutoButton) {
+      stepAutoButton.disabled = true;
+      stepAutoButton.textContent = '自動再生';
+    }
+    return;
+  }
+
+  const currentIndex = stepperState.index;
+  const hasSelection = currentIndex >= 0 && currentIndex < totalFrames;
+  const currentFrame = hasSelection ? stepperState.frames[currentIndex] : null;
+
+  if (!hasSelection) {
+    stepStatusHeading.textContent = stepperState.hasErrors ? '結果を確認できます' : 'ステップ準備完了';
+    stepStatusMessage.textContent = stepperState.defaultMessage;
+    stepDetailMessage.textContent = DEFAULT_STEPPER_DETAIL;
+    stepIndexLabel.textContent = `0 / ${totalFrames}`;
+    stepPositionLabel.textContent = '--';
+    stepFacingLabel.textContent = '--';
+  } else if (currentFrame) {
+    const heading = currentFrame.kind === 'error' ? 'エラー' : isAuto ? '自動再生中' : 'ステップ確認中';
+    stepStatusHeading.textContent = heading;
+    const label = currentFrame.label ?? `ステップ ${currentIndex + 1}`;
+    stepStatusMessage.textContent = label;
+    stepDetailMessage.textContent = currentFrame.message || '—';
+    stepIndexLabel.textContent = `${currentIndex + 1} / ${totalFrames}`;
+    stepPositionLabel.textContent = `${currentFrame.row + 1}, ${currentFrame.col + 1}`;
+    stepFacingLabel.textContent = formatFacing(currentFrame.facing);
+  }
+
+  if (stepStartButton) {
+    stepStartButton.disabled = isAuto;
+  }
+  if (stepPrevButton) {
+    stepPrevButton.disabled = isAuto || currentIndex <= 0;
+  }
+  if (stepNextButton) {
+    const disableNext = isAuto || (hasSelection ? currentIndex >= totalFrames - 1 : false);
+    stepNextButton.disabled = disableNext;
+  }
+  if (stepAutoButton) {
+    stepAutoButton.disabled = false;
+    stepAutoButton.textContent = isAuto ? '停止' : '自動再生';
+  }
+};
+
+const resetStepper = (message = DEFAULT_STEPPER_HINT) => {
+  if (!stepperCard) {
+    return;
+  }
+  stopAutoPlay();
+  stepperState.frames = [];
+  stepperState.index = -1;
+  stepperState.mapData = null;
+  stepperState.hasErrors = false;
+  stepperState.defaultMessage = message;
+  stepperState.commandTotal = 0;
+  updateStepperUI();
+};
+
+const applyStep = (index) => {
+  if (!stepperState.mapData) {
+    return;
+  }
+  const totalFrames = stepperState.frames.length;
+  if (index < 0 || index >= totalFrames) {
+    return;
+  }
+  stepperState.index = index;
+  const frame = stepperState.frames[index];
+  const visitedSet = new Set(frame.visited ?? []);
+  renderMapPreview(stepperState.mapData, visitedSet, {
+    row: frame.row,
+    col: frame.col,
+    facing: frame.facing,
+  });
+  updateStepperUI();
+};
+
+const prepareStepper = (mapData, simulation) => {
+  if (!stepperCard) {
+    return;
+  }
+  stopAutoPlay();
+  stepperState.frames = simulation.frames ?? [];
+  stepperState.index = -1;
+  stepperState.mapData = mapData;
+  stepperState.hasErrors = simulation.errors.length > 0;
+  stepperState.defaultMessage = '「最初から」または「次へ」でステップ実行を開始します。';
+  stepperState.commandTotal = simulation.stepsExecuted ?? 0;
+  updateStepperUI();
+};
+
+const toggleAutoPlay = () => {
+  if (!stepperCard || stepperState.frames.length === 0) {
+    return;
+  }
+
+  if (stepperState.autoTimer) {
+    stopAutoPlay();
+    updateStepperUI();
+    return;
+  }
+
+  if (!stepperState.mapData) {
+    return;
+  }
+
+  const advance = () => {
+    if (stepperState.index >= stepperState.frames.length - 1) {
+      stopAutoPlay();
+      updateStepperUI();
+      return;
+    }
+    applyStep(stepperState.index + 1);
+  };
+
+  if (stepperState.index < 0 || stepperState.index >= stepperState.frames.length - 1) {
+    applyStep(0);
+  } else {
+    advance();
+  }
+
+  stepperState.autoTimer = window.setInterval(advance, STEP_AUTO_INTERVAL);
+  updateStepperUI();
+};
+
 const runValidation = () => {
+  resetStepper('検証中です…');
   try {
     resetLog();
 
@@ -1245,15 +1523,17 @@ const runValidation = () => {
       errors: simulation.errors.length,
     });
     renderMapPreview(mapData, simulation.visitedPath);
+    prepareStepper(mapData, simulation);
 
     previewNote.textContent = hasErrors
       ? '訪問した経路を確認し、ログで問題のステップを参照してください。'
       : program.metadata.hasDynamicControlFlow
-        ? '条件分岐やループの判定ログが追加されました。ハイライトと併せてご確認ください。'
-        : '訪問経路がハイライトされました。';
+        ? '条件分岐やループの判定ログが追加されました。ステップ実行で分岐ごとの移動も追跡できます。'
+        : '訪問経路がハイライトされました。ステップ実行でコマンドごとの移動も確認できます。';
   } catch (error) {
     updateStatusCard('error', [error.message]);
     updateMetrics({ steps: 0, gemsCollected: 0, totalGems: 0, switchesOpen: 0, totalSwitches: 0, errors: 1 });
+    resetStepper('エラーが発生したため、修正後に再度検証してください。');
   }
 };
 
@@ -1293,11 +1573,13 @@ const clearInputs = () => {
   updateStatusCard('idle');
   updateMetrics({ steps: 0, gemsCollected: 0, totalGems: 0, switchesOpen: 0, totalSwitches: 0, errors: 0 });
   previewNote.textContent = 'マップを編集するとリアルタイムで更新されます。';
+  resetStepper();
 };
 
 const updateMapPreviewDebounced = (() => {
   let timer = null;
   return () => {
+    resetStepper('入力が変更されたため、最新の検証を実行してください。');
     if (timer) {
       window.clearTimeout(timer);
     }
@@ -1317,6 +1599,7 @@ const updateMapPreviewDebounced = (() => {
 const updateCommandCountDebounced = (() => {
   let timer = null;
   return () => {
+    resetStepper('入力が変更されたため、最新の検証を実行してください。');
     if (timer) {
       window.clearTimeout(timer);
     }
@@ -1353,6 +1636,7 @@ const init = () => {
 
   updateStatusCard('idle');
   updateMetrics({ steps: 0, gemsCollected: 0, totalGems: 0, switchesOpen: 0, totalSwitches: 0, errors: 0 });
+  resetStepper();
 
   mapInput.addEventListener('input', updateMapPreviewDebounced);
   solutionInput.addEventListener('input', updateCommandCountDebounced);
@@ -1368,6 +1652,35 @@ const init = () => {
   downloadReportButton?.addEventListener('click', handleDownloadReport);
   expandLogButton?.addEventListener('click', () => toggleLogExpansion(true));
   collapseLogButton?.addEventListener('click', () => toggleLogExpansion(false));
+  stepStartButton?.addEventListener('click', () => {
+    if (!stepperState.frames.length) {
+      return;
+    }
+    stopAutoPlay();
+    applyStep(0);
+  });
+  stepPrevButton?.addEventListener('click', () => {
+    if (!stepperState.frames.length) {
+      return;
+    }
+    stopAutoPlay();
+    if (stepperState.index > 0) {
+      applyStep(stepperState.index - 1);
+    } else {
+      updateStepperUI();
+    }
+  });
+  stepNextButton?.addEventListener('click', () => {
+    if (!stepperState.frames.length) {
+      return;
+    }
+    stopAutoPlay();
+    const nextIndex = stepperState.index < 0 ? 0 : Math.min(stepperState.frames.length - 1, stepperState.index + 1);
+    applyStep(nextIndex);
+  });
+  stepAutoButton?.addEventListener('click', () => {
+    toggleAutoPlay();
+  });
 
   // 初期レンダリング
   if (mapInput.value.trim().length > 0) {
