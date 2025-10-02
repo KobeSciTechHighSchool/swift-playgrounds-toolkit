@@ -106,6 +106,8 @@ if isBlocked && isBlockedRight {
 }
 ```
 
+`else if` による多段分岐もそのまま使用でき、Swift Playgrounds の記法に揃えて記述しても正しく解析されます。
+
 ## 開発メモ
 
 - `scripts/app.js`: マップ/命令のパーサ、シミュレーター、UI ロジック

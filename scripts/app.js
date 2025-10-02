@@ -463,12 +463,29 @@ const preprocessSolutionTokens = (solutionText) => {
       return line.replace(/\/\/.*$/u, '');
     });
 
-  return cleanedLines
+  const baseTokens = cleanedLines
     .join('\n')
     .replace(/([{}])/g, '\n$1\n')
     .split(/[\r\n]+/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+
+  const normalizedTokens = [];
+
+  for (const token of baseTokens) {
+    if (/^else\s*if\b/i.test(token)) {
+      const ifPart = token.replace(/^else\s*/i, '').trim();
+      normalizedTokens.push('else');
+      if (ifPart.length > 0) {
+        normalizedTokens.push(ifPart);
+      }
+      continue;
+    }
+
+    normalizedTokens.push(token);
+  }
+
+  return normalizedTokens;
 };
 
 const parseCommands = (solutionText) => {
