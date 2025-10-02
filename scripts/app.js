@@ -74,6 +74,212 @@ const ConditionPredicate = {
 
 const CONDITION_PREDICATES = new Set(Object.values(ConditionPredicate));
 
+const CONDITION_OPERATOR_PRECEDENCE = {
+  '||': 1,
+  '&&': 2,
+};
+
+const tokenizeBooleanCondition = (source) => {
+  const tokens = [];
+  let index = 0;
+  const input = source.trim();
+
+  while (index < input.length) {
+    const remaining = input.slice(index);
+
+    if (/^\s+/u.test(remaining)) {
+      index += remaining.match(/^\s+/u)[0].length;
+      continue;
+    }
+
+    if (remaining.startsWith('&&')) {
+      tokens.push('&&');
+      index += 2;
+      continue;
+    }
+
+    if (remaining.startsWith('||')) {
+      tokens.push('||');
+      index += 2;
+      continue;
+    }
+
+    if (remaining.startsWith('!')) {
+      tokens.push('!');
+      index += 1;
+      continue;
+    }
+
+    const char = remaining[0];
+    if (char === '(' || char === ')') {
+      tokens.push(char);
+      index += 1;
+      continue;
+    }
+
+    const identifierMatch = remaining.match(/^[A-Za-z_][A-Za-z0-9_]*/u);
+    if (identifierMatch) {
+      const identifier = identifierMatch[0];
+      if (/^not$/iu.test(identifier)) {
+        tokens.push('!');
+      } else {
+        tokens.push(identifier);
+      }
+      index += identifier.length;
+      continue;
+    }
+
+    throw new Error(`条件式で使用できない記号です: ${char}`);
+  }
+
+  if (!tokens.length) {
+    throw new Error('条件式を指定してください。');
+  }
+
+  return tokens;
+};
+
+const parseBooleanCondition = (source) => {
+  const tokens = tokenizeBooleanCondition(source);
+  let position = 0;
+
+  const peek = () => tokens[position] ?? null;
+  const consume = (expected) => {
+    const token = tokens[position];
+    if (expected && token !== expected) {
+      throw new Error(`条件式の構文が正しくありません。期待: ${expected}, 実際: ${token ?? '終端'}`);
+    }
+    if (!token) {
+      throw new Error('条件式が途中で終了しました。');
+    }
+    position += 1;
+    return token;
+  };
+
+  const parseExpression = () => parseOr();
+
+  const parseOr = () => {
+    let node = parseAnd();
+    while (peek() === '||') {
+      consume('||');
+      const right = parseAnd();
+      node = { type: 'logical', operator: '||', left: node, right };
+    }
+    return node;
+  };
+
+  const parseAnd = () => {
+    let node = parseUnary();
+    while (peek() === '&&') {
+      consume('&&');
+      const right = parseUnary();
+      node = { type: 'logical', operator: '&&', left: node, right };
+    }
+    return node;
+  };
+
+  const parseUnary = () => {
+    const token = peek();
+    if (token === '!') {
+      consume('!');
+      return { type: 'not', operand: parseUnary() };
+    }
+
+    if (token === '(') {
+      consume('(');
+      const expression = parseExpression();
+      if (peek() !== ')') {
+        throw new Error('条件式の括弧が閉じられていません。');
+      }
+      consume(')');
+      return expression;
+    }
+
+    if (!token) {
+      throw new Error('条件式が途中で終了しました。');
+    }
+
+    consume(token);
+    const normalized = token.trim();
+    if (!CONDITION_PREDICATES.has(normalized)) {
+      throw new Error(`サポートされていない条件式です: ${token}`);
+    }
+    return { type: 'predicate', name: normalized };
+  };
+
+  const ast = parseExpression();
+
+  if (position !== tokens.length) {
+    throw new Error(`条件式で想定外のトークンを検出しました: ${tokens[position]}`);
+  }
+
+  return ast;
+};
+
+const shouldWrapConditionChild = (parentOperator, childNode) => {
+  if (!childNode || childNode.type !== 'logical') {
+    return false;
+  }
+  return CONDITION_OPERATOR_PRECEDENCE[childNode.operator] < CONDITION_OPERATOR_PRECEDENCE[parentOperator];
+};
+
+const formatBooleanCondition = (node) => {
+  if (!node) {
+    return '';
+  }
+
+  if (node.type === 'predicate') {
+    return node.name;
+  }
+
+  if (node.type === 'not') {
+    const formatted = formatBooleanCondition(node.operand);
+    if (node.operand && node.operand.type === 'logical') {
+      return `!(${formatted})`;
+    }
+    return `!${formatted}`;
+  }
+
+  if (node.type === 'logical') {
+    const left = formatBooleanCondition(node.left);
+    const right = formatBooleanCondition(node.right);
+    const leftFormatted = shouldWrapConditionChild(node.operator, node.left) ? `(${left})` : left;
+    const rightFormatted = shouldWrapConditionChild(node.operator, node.right) ? `(${right})` : right;
+    return `${leftFormatted} ${node.operator} ${rightFormatted}`;
+  }
+
+  throw new Error('未知の条件式ノードです。');
+};
+
+const evaluateBooleanCondition = (node, predicateEvaluator) => {
+  if (!node) {
+    return false;
+  }
+
+  if (node.type === 'predicate') {
+    return predicateEvaluator(node.name);
+  }
+
+  if (node.type === 'not') {
+    return !evaluateBooleanCondition(node.operand, predicateEvaluator);
+  }
+
+  if (node.type === 'logical') {
+    if (node.operator === '&&') {
+      return (
+        evaluateBooleanCondition(node.left, predicateEvaluator) &&
+        evaluateBooleanCondition(node.right, predicateEvaluator)
+      );
+    }
+    return (
+      evaluateBooleanCondition(node.left, predicateEvaluator) ||
+      evaluateBooleanCondition(node.right, predicateEvaluator)
+    );
+  }
+
+  throw new Error('未知の条件式ノードです。');
+};
+
 const directionVectors = {
   up: { row: -1, col: 0 },
   down: { row: 1, col: 0 },
@@ -275,7 +481,7 @@ const parseCommands = (solutionText) => {
   let containsDynamicControlFlow = false;
 
   const parseCondition = (token, keyword) => {
-    const pattern = new RegExp(`^${keyword}\\s+(.+)$`, 'i');
+    const pattern = new RegExp(`^${keyword}\s+(.+)$`, 'i');
     const match = token.match(pattern);
     if (!match) {
       throw new Error(`${keyword} 文の条件を解析できません: ${token}`);
@@ -286,27 +492,14 @@ const parseCommands = (solutionText) => {
       throw new Error(`${keyword} 文の条件を指定してください。`);
     }
 
-    let negated = false;
-    let predicateSource = rawCondition;
-
-    if (predicateSource.startsWith('!')) {
-      negated = true;
-      predicateSource = predicateSource.slice(1).trim();
-    } else if (/^not\s+/i.test(predicateSource)) {
-      negated = true;
-      predicateSource = predicateSource.replace(/^not\s+/i, '').trim();
+    try {
+      return parseBooleanCondition(rawCondition);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`${keyword} 文の条件式を解析できません: ${error.message}`);
+      }
+      throw error;
     }
-
-    if (!predicateSource) {
-      throw new Error(`${keyword} 文の条件を指定してください。`);
-    }
-
-    const predicate = predicateSource.replace(/\s+/g, '');
-    if (!CONDITION_PREDICATES.has(predicate)) {
-      throw new Error(`サポートされていない条件式です: ${predicateSource}`);
-    }
-
-    return { predicate, negated };
   };
 
   const parseBlock = (startIndex) => {
@@ -635,7 +828,7 @@ const simulateProgram = (mapData, program) => {
     return true;
   };
 
-  const formatCondition = (condition) => `${condition.negated ? '!' : ''}${condition.predicate}`;
+  const formatCondition = (condition) => formatBooleanCondition(condition);
 
   const isBlockedInDirection = (direction) => {
     const vector = directionVectors[direction];
@@ -673,10 +866,7 @@ const simulateProgram = (mapData, program) => {
     }
   };
 
-  const evaluateCondition = (condition) => {
-    const result = evaluatePredicate(condition.predicate);
-    return condition.negated ? !result : result;
-  };
+  const evaluateCondition = (condition) => evaluateBooleanCondition(condition, evaluatePredicate);
 
   const executeCommand = (type) => {
     if (halted) {
