@@ -62,6 +62,39 @@ const Command = {
   TOGGLE_SWITCH: 'toggleSwitch',
 };
 
+const StatementKind = {
+  COMMAND: 'command',
+  LOOP: 'loop',
+  CALL: 'call',
+  CONDITIONAL: 'conditional',
+};
+
+const ExpressionKind = {
+  IDENTIFIER: 'identifier',
+  LITERAL: 'literal',
+  NOT: 'not',
+  AND: 'and',
+  OR: 'or',
+};
+
+const BOOLEAN_SENSORS = new Set([
+  'isOnGem',
+  'isOnClosedSwitch',
+  'isOnOpenSwitch',
+  'isOnSwitch',
+  'isOnPortal',
+  'isBlocked',
+  'isBlockedFront',
+  'isBlockedAhead',
+  'isBlockedLeft',
+  'isBlockedRight',
+  'isBlockedBack',
+  'isFacingNorth',
+  'isFacingSouth',
+  'isFacingEast',
+  'isFacingWest',
+]);
+
 const directionVectors = {
   up: { row: -1, col: 0 },
   down: { row: 1, col: 0 },
@@ -260,6 +293,177 @@ const parseCommands = (solutionText) => {
   }
 
   const functions = new Map();
+  let hasConditionals = false;
+
+  const tokenizeCondition = (expression) => {
+    const items = [];
+    const pattern = /\s*(&&|\|\||!|\(|\)|[A-Za-z_][A-Za-z0-9_]*)\s*/gy;
+    let index = 0;
+
+    while (index < expression.length) {
+      pattern.lastIndex = index;
+      const match = pattern.exec(expression);
+      if (!match || match.index !== index) {
+        throw new Error(`条件式を解析できません: ${expression}`);
+      }
+      items.push(match[1]);
+      index = pattern.lastIndex;
+    }
+
+    return items;
+  };
+
+  const parseConditionExpression = (rawExpression) => {
+    const expression = rawExpression.trim();
+    if (!expression) {
+      throw new Error('if 文の条件が空です。');
+    }
+
+    const conditionTokens = tokenizeCondition(expression);
+    let position = 0;
+
+    const parsePrimary = () => {
+      const token = conditionTokens[position];
+      if (!token) {
+        throw new Error(`条件式を解析できません: ${expression}`);
+      }
+
+      if (token === '(') {
+        position += 1;
+        const inner = parseOr();
+        if (conditionTokens[position] !== ')') {
+          throw new Error('括弧の対応が取れていません。');
+        }
+        position += 1;
+        return inner;
+      }
+
+      if (token === 'true' || token === 'false') {
+        position += 1;
+        return { type: ExpressionKind.LITERAL, value: token === 'true' };
+      }
+
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/u.test(token)) {
+        if (!BOOLEAN_SENSORS.has(token) && token !== 'true' && token !== 'false') {
+          throw new Error(`未知の条件式です: ${token}`);
+        }
+        position += 1;
+        return { type: ExpressionKind.IDENTIFIER, name: token };
+      }
+
+      throw new Error(`条件式を解析できません: ${expression}`);
+    };
+
+    const parseNot = () => {
+      if (conditionTokens[position] === '!') {
+        position += 1;
+        return { type: ExpressionKind.NOT, expression: parseNot() };
+      }
+      return parsePrimary();
+    };
+
+    const parseAnd = () => {
+      let node = parseNot();
+      while (conditionTokens[position] === '&&') {
+        position += 1;
+        node = { type: ExpressionKind.AND, left: node, right: parseNot() };
+      }
+      return node;
+    };
+
+    const parseOr = () => {
+      let node = parseAnd();
+      while (conditionTokens[position] === '||') {
+        position += 1;
+        node = { type: ExpressionKind.OR, left: node, right: parseAnd() };
+      }
+      return node;
+    };
+
+    const result = parseOr();
+    if (position < conditionTokens.length) {
+      throw new Error(`条件式の解析で未処理のトークンがあります: ${conditionTokens.slice(position).join(' ')}`);
+    }
+    return result;
+  };
+
+  const parseBlock = (startIndex) => {
+    if (tokens[startIndex] !== '{') {
+      throw new Error('開きカッコ { が必要です。');
+    }
+
+    const statements = [];
+    let index = startIndex + 1;
+
+    while (index < tokens.length && tokens[index] !== '}') {
+      const nestedToken = tokens[index];
+      if (/^func\s+/u.test(nestedToken)) {
+        throw new Error('関数を他の関数やループの内部で定義することはできません。');
+      }
+
+      const { statement, nextIndex } = parseExecutableStatement(index);
+      statements.push(statement);
+      index = nextIndex;
+    }
+
+    if (index >= tokens.length || tokens[index] !== '}') {
+      throw new Error('ブロックに対応する閉じカッコ } が見つかりません。');
+    }
+
+    return { statements, nextIndex: index + 1 };
+  };
+
+  const parseConditional = (currentIndex) => {
+    hasConditionals = true;
+
+    const branches = [];
+    let index = currentIndex;
+    let hasElse = false;
+
+    const firstToken = tokens[index];
+    if (!/^if\s+/u.test(firstToken)) {
+      throw new Error(`if 文の解析に失敗しました: ${firstToken}`);
+    }
+
+    const conditionText = firstToken.replace(/^if\s+/u, '').trim();
+    const condition = parseConditionExpression(conditionText);
+    const firstBlock = parseBlock(index + 1);
+    branches.push({ condition, statements: firstBlock.statements });
+    index = firstBlock.nextIndex;
+
+    while (index < tokens.length) {
+      const token = tokens[index];
+      if (/^else\s+if\s+/u.test(token)) {
+        if (hasElse) {
+          throw new Error('else の後に else if は使用できません。');
+        }
+        const elseIfCondition = token.replace(/^else\s+if\s+/u, '').trim();
+        const parsedCondition = parseConditionExpression(elseIfCondition);
+        const branchBlock = parseBlock(index + 1);
+        branches.push({ condition: parsedCondition, statements: branchBlock.statements });
+        index = branchBlock.nextIndex;
+        continue;
+      }
+
+      if (token === 'else') {
+        if (hasElse) {
+          throw new Error('else は 1 回だけ使用できます。');
+        }
+        const elseBlock = parseBlock(index + 1);
+        branches.push({ condition: null, statements: elseBlock.statements });
+        index = elseBlock.nextIndex;
+        hasElse = true;
+        continue;
+      }
+
+      break;
+    }
+
+    return {
+      statement: { kind: StatementKind.CONDITIONAL, branches },
+      nextIndex: index,
+    };
+  };
 
   const parseExecutableStatement = (currentIndex) => {
     const token = tokens[currentIndex];
@@ -280,9 +484,17 @@ const parseCommands = (solutionText) => {
 
       const { statements, nextIndex } = parseBlock(currentIndex + 1);
       return {
-        statement: { kind: 'loop', count: iterations, body: statements },
+        statement: { kind: StatementKind.LOOP, count: iterations, body: statements },
         nextIndex,
       };
+    }
+
+    if (/^if\s+/u.test(token)) {
+      return parseConditional(currentIndex);
+    }
+
+    if (/^else\b/u.test(token)) {
+      throw new Error('else は単独で使用できません。');
     }
 
     const normalized = token.replace(/\s+/g, '');
@@ -291,44 +503,18 @@ const parseCommands = (solutionText) => {
       const base = normalized.replace(/\(.*\)$/u, '');
       if (Object.values(Command).includes(base)) {
         return {
-          statement: { kind: 'command', type: base },
+          statement: { kind: StatementKind.COMMAND, type: base },
           nextIndex: currentIndex + 1,
         };
       }
 
       return {
-        statement: { kind: 'call', name: base },
+        statement: { kind: StatementKind.CALL, name: base },
         nextIndex: currentIndex + 1,
       };
     }
 
     throw new Error(`未知の命令です: ${token}`);
-  };
-
-  const parseBlock = (startIndex) => {
-    if (tokens[startIndex] !== '{') {
-      throw new Error('開きカッコ { が必要です。');
-    }
-
-    const statements = [];
-    let index = startIndex + 1;
-
-    while (index < tokens.length && tokens[index] !== '}') {
-      const token = tokens[index];
-      if (/^func\s+/u.test(token)) {
-        throw new Error('関数を他の関数やループの内部で定義することはできません。');
-      }
-
-      const { statement, nextIndex } = parseExecutableStatement(index);
-      statements.push(statement);
-      index = nextIndex;
-    }
-
-    if (index >= tokens.length || tokens[index] !== '}') {
-      throw new Error('ブロックに対応する閉じカッコ } が見つかりません。');
-    }
-
-    return { statements, nextIndex: index + 1 };
   };
 
   const parseFunctionDefinition = (currentIndex) => {
@@ -372,23 +558,21 @@ const parseCommands = (solutionText) => {
     throw new Error('実行する命令が見つかりません。');
   }
 
-  const commands = [];
+  const estimateStatements = (statements, callStack = []) => {
+    let total = 0;
 
-  const expandStatements = (statements, callStack = []) => {
     statements.forEach((statement) => {
-      if (statement.kind === 'command') {
-        commands.push({ type: statement.type });
+      if (statement.kind === StatementKind.COMMAND) {
+        total += 1;
         return;
       }
 
-      if (statement.kind === 'loop') {
-        for (let iteration = 0; iteration < statement.count; iteration += 1) {
-          expandStatements(statement.body, callStack);
-        }
+      if (statement.kind === StatementKind.LOOP) {
+        total += statement.count * estimateStatements(statement.body, callStack);
         return;
       }
 
-      if (statement.kind === 'call') {
+      if (statement.kind === StatementKind.CALL) {
         if (!functions.has(statement.name)) {
           throw new Error(`未定義の関数を呼び出しています: ${statement.name}()`);
         }
@@ -398,14 +582,30 @@ const parseCommands = (solutionText) => {
         }
 
         const nextStack = [...callStack, statement.name];
-        expandStatements(functions.get(statement.name), nextStack);
+        total += estimateStatements(functions.get(statement.name), nextStack);
+        return;
+      }
+
+      if (statement.kind === StatementKind.CONDITIONAL) {
+        if (!statement.branches.length) {
+          return;
+        }
+        const branchCounts = statement.branches.map((branch) => estimateStatements(branch.statements, callStack));
+        total += Math.max(...branchCounts);
       }
     });
+
+    return total;
   };
 
-  expandStatements(mainStatements);
+  const estimatedCommands = estimateStatements(mainStatements);
 
-  return commands;
+  return {
+    main: mainStatements,
+    functions,
+    estimatedCommands,
+    hasConditionals,
+  };
 };
 
 const getCell = (grid, row, col) => {
@@ -430,7 +630,7 @@ const rotateDirection = (current, turn) => {
   return rotations[nextIndex];
 };
 
-const simulateCommands = (mapData, commands) => {
+const simulateProgram = (mapData, program) => {
   const logEntries = [];
   const errors = [];
   const visitedPath = new Set();
@@ -442,6 +642,7 @@ const simulateCommands = (mapData, commands) => {
   let currentCol = mapData.start.col;
   let facing = mapData.start.direction;
   let halted = false;
+  let stepsExecuted = 0;
 
   const recordLog = (message, kind = 'info') => {
     logEntries.push({ message, kind, position: { row: currentRow, col: currentCol }, facing });
@@ -454,16 +655,98 @@ const simulateCommands = (mapData, commands) => {
 
   recordLog(`スタート位置 (${currentRow + 1}, ${currentCol + 1}) から ${facing} 向きで開始します。`, 'success');
 
-  commands.forEach((command, index) => {
+  const isDirectionBlocked = (direction) => {
+    const vector = directionVectors[direction];
+    if (!vector) {
+      return true;
+    }
+    const targetRow = currentRow + vector.row;
+    const targetCol = currentCol + vector.col;
+    const targetCell = getCell(mapData.grid, targetRow, targetCol);
+    if (!targetCell) {
+      return true;
+    }
+    return targetCell.type === 'wall';
+  };
+
+  const evaluateSensor = (name) => {
+    const cellKey = `${currentRow},${currentCol}`;
+    const currentCell = getCell(mapData.grid, currentRow, currentCol);
+
+    switch (name) {
+      case 'isOnGem':
+        return remainingGems.has(cellKey);
+      case 'isOnClosedSwitch':
+        return switchesState.get(cellKey) === 'closed';
+      case 'isOnOpenSwitch':
+        return switchesState.get(cellKey) === 'open';
+      case 'isOnSwitch':
+        return switchesState.has(cellKey);
+      case 'isOnPortal':
+        return Boolean(currentCell?.warpId);
+      case 'isBlocked':
+      case 'isBlockedFront':
+      case 'isBlockedAhead':
+        return isDirectionBlocked(facing);
+      case 'isBlockedLeft':
+        return isDirectionBlocked(rotateDirection(facing, 'left'));
+      case 'isBlockedRight':
+        return isDirectionBlocked(rotateDirection(facing, 'right'));
+      case 'isBlockedBack': {
+        const back = rotateDirection(rotateDirection(facing, 'left'), 'left');
+        return isDirectionBlocked(back);
+      }
+      case 'isFacingNorth':
+        return facing === 'up';
+      case 'isFacingSouth':
+        return facing === 'down';
+      case 'isFacingEast':
+        return facing === 'right';
+      case 'isFacingWest':
+        return facing === 'left';
+      default:
+        throw new Error(`未知の条件式です: ${name}`);
+    }
+  };
+
+  const evaluateExpression = (expression) => {
+    if (expression.type === ExpressionKind.LITERAL) {
+      return expression.value;
+    }
+    if (expression.type === ExpressionKind.IDENTIFIER) {
+      return evaluateSensor(expression.name);
+    }
+    if (expression.type === ExpressionKind.NOT) {
+      return !evaluateExpression(expression.expression);
+    }
+    if (expression.type === ExpressionKind.AND) {
+      if (!evaluateExpression(expression.left)) {
+        return false;
+      }
+      return evaluateExpression(expression.right);
+    }
+    if (expression.type === ExpressionKind.OR) {
+      if (evaluateExpression(expression.left)) {
+        return true;
+      }
+      return evaluateExpression(expression.right);
+    }
+
+    throw new Error('未知の条件式を評価しようとしました。');
+  };
+
+  const executeCommand = (commandType) => {
     if (halted) {
       return;
     }
 
-    const humanIndex = index + 1;
+    const humanIndex = stepsExecuted + 1;
+    stepsExecuted += 1;
+
     const cellKey = `${currentRow},${currentCol}`;
     visitedPath.add(cellKey);
 
-    if (command.type === Command.MOVE_FORWARD) {
+    if (commandType === Command.MOVE_FORWARD) {
       const vector = directionVectors[facing];
       const targetRow = currentRow + vector.row;
       const targetCol = currentCol + vector.col;
@@ -496,11 +779,17 @@ const simulateCommands = (mapData, commands) => {
         currentCol = destination.col;
         recordLog(`ワープ W${targetCell.warpId} を通過し、(${currentRow + 1}, ${currentCol + 1}) に移動しました。`, 'success');
       }
-    } else if (command.type === Command.TURN_LEFT || command.type === Command.TURN_RIGHT) {
-      const turnDirection = command.type === Command.TURN_LEFT ? 'left' : 'right';
+      return;
+    }
+
+    if (commandType === Command.TURN_LEFT || commandType === Command.TURN_RIGHT) {
+      const turnDirection = commandType === Command.TURN_LEFT ? 'left' : 'right';
       facing = rotateDirection(facing, turnDirection);
       recordLog(`コマンド ${humanIndex}: ${turnDirection === 'left' ? '左' : '右'}へ回転し、向きは ${facing} になりました。`);
-    } else if (command.type === Command.COLLECT_GEM) {
+      return;
+    }
+
+    if (commandType === Command.COLLECT_GEM) {
       const gemKey = `${currentRow},${currentCol}`;
       if (!remainingGems.has(gemKey)) {
         recordError(`コマンド ${humanIndex}: 床にジェムが存在しません。`);
@@ -510,7 +799,10 @@ const simulateCommands = (mapData, commands) => {
       remainingGems.delete(gemKey);
       gemsCollected += 1;
       recordLog(`コマンド ${humanIndex}: ジェムを回収しました (合計 ${gemsCollected})。`, 'success');
-    } else if (command.type === Command.TOGGLE_SWITCH) {
+      return;
+    }
+
+    if (commandType === Command.TOGGLE_SWITCH) {
       const switchKey = `${currentRow},${currentCol}`;
       if (!switchesState.has(switchKey)) {
         recordError(`コマンド ${humanIndex}: スイッチが存在しません。`);
@@ -522,7 +814,63 @@ const simulateCommands = (mapData, commands) => {
       switchesState.set(switchKey, nextState);
       recordLog(`コマンド ${humanIndex}: スイッチを ${nextState === 'open' ? '開けました' : '閉じました'}。`, 'info');
     }
-  });
+  };
+
+  const executeStatements = (statements, callStack = []) => {
+    for (const statement of statements) {
+      if (halted) {
+        return;
+      }
+
+      if (statement.kind === StatementKind.COMMAND) {
+        executeCommand(statement.type);
+        continue;
+      }
+
+      if (statement.kind === StatementKind.LOOP) {
+        for (let iteration = 0; iteration < statement.count; iteration += 1) {
+          if (halted) {
+            break;
+          }
+          executeStatements(statement.body, callStack);
+        }
+        continue;
+      }
+
+      if (statement.kind === StatementKind.CALL) {
+        if (!program.functions.has(statement.name)) {
+          recordError(`未定義の関数を呼び出しています: ${statement.name}()`);
+          halted = true;
+          return;
+        }
+
+        if (callStack.includes(statement.name)) {
+          recordError(`再帰的な関数呼び出しはサポートされていません: ${statement.name}()`);
+          halted = true;
+          return;
+        }
+
+        const nextStack = [...callStack, statement.name];
+        executeStatements(program.functions.get(statement.name), nextStack);
+        continue;
+      }
+
+      if (statement.kind === StatementKind.CONDITIONAL) {
+        for (const branch of statement.branches) {
+          if (halted) {
+            return;
+          }
+          const conditionResult = branch.condition === null ? true : evaluateExpression(branch.condition);
+          if (conditionResult) {
+            executeStatements(branch.statements, callStack);
+            break;
+          }
+        }
+      }
+    }
+  };
+
+  executeStatements(program.main);
 
   const unresolvedSwitches = Array.from(switchesState.values()).filter((state) => state !== 'open').length;
   const openSwitches = switchesState.size - unresolvedSwitches;
@@ -543,6 +891,7 @@ const simulateCommands = (mapData, commands) => {
     totalGems: mapData.gems.size,
     switchesOpen: openSwitches,
     totalSwitches: mapData.switches.size,
+    steps: stepsExecuted,
   };
 };
 
@@ -637,8 +986,17 @@ const setMapCounts = (mapData) => {
   mapSizeChip.textContent = `${mapData.rows} × ${mapData.columns}`;
 };
 
-const setCommandCount = (commands) => {
-  commandCountChip.textContent = `${commands.length} コマンド`;
+const setCommandCount = (count, hasConditionals = false) => {
+  if (typeof count === 'number' && Number.isFinite(count)) {
+    if (hasConditionals) {
+      commandCountChip.textContent = `約 ${count} コマンド (条件で変動)`;
+      return;
+    }
+    commandCountChip.textContent = `${count} コマンド`;
+    return;
+  }
+
+  commandCountChip.textContent = hasConditionals ? '条件付き — コマンド' : '— コマンド';
 };
 
 const runValidation = () => {
@@ -649,10 +1007,10 @@ const runValidation = () => {
     setMapCounts(mapData);
     renderMapPreview(mapData);
 
-    const commands = parseCommands(solutionInput.value);
-    setCommandCount(commands);
+  const program = parseCommands(solutionInput.value);
+  setCommandCount(program.estimatedCommands, program.hasConditionals);
 
-    const simulation = simulateCommands(mapData, commands);
+  const simulation = simulateProgram(mapData, program);
 
     simulation.logs.forEach((entry) => appendLogEntry(entry));
 
@@ -660,7 +1018,7 @@ const runValidation = () => {
     const status = hasErrors ? 'failure' : 'success';
     updateStatusCard(status, simulation.errors);
     updateMetrics({
-      steps: commands.length,
+  steps: simulation.steps,
       gemsCollected: simulation.gemsCollected,
       totalGems: simulation.totalGems,
       switchesOpen: simulation.switchesOpen,
@@ -743,8 +1101,8 @@ const updateCommandCountDebounced = (() => {
     }
     timer = window.setTimeout(() => {
       try {
-        const commands = parseCommands(solutionInput.value);
-        setCommandCount(commands);
+        const program = parseCommands(solutionInput.value);
+        setCommandCount(program.estimatedCommands, program.hasConditionals);
       } catch {
         commandCountChip.textContent = '— コマンド';
       }
@@ -803,8 +1161,8 @@ const init = () => {
 
   if (solutionInput.value.trim().length > 0) {
     try {
-      const commands = parseCommands(solutionInput.value);
-      setCommandCount(commands);
+      const program = parseCommands(solutionInput.value);
+      setCommandCount(program.estimatedCommands, program.hasConditionals);
     } catch {
       // ignore
     }
