@@ -33,6 +33,9 @@ const stepStartButton = document.querySelector('#stepStartButton');
 const stepPrevButton = document.querySelector('#stepPrevButton');
 const stepNextButton = document.querySelector('#stepNextButton');
 const stepAutoButton = document.querySelector('#stepAutoButton');
+const codePanel = document.querySelector('#codePanel');
+const codePanelHint = document.querySelector('#codePanelHint');
+const codeLineList = document.querySelector('#codeLineList');
 
 const legend = {
   stop: '止',
@@ -346,6 +349,8 @@ const detailMessages = {
 const DEFAULT_STEPPER_HINT = '「検証を実行」を押すとステップ実行が有効になります。';
 const DEFAULT_STEPPER_DETAIL = 'ステップごとのメッセージがここに表示されます。';
 const STEP_AUTO_INTERVAL = 700;
+const DEFAULT_CODE_HINT = '入力した Swift コードがここに表示されます。';
+const ACTIVE_CODE_HINT = 'ステップ実行で現在のコマンド行がハイライトされます。';
 
 const formatTimestamp = () => {
   return new Intl.DateTimeFormat('ja-JP', {
@@ -387,6 +392,82 @@ const toRoman = (num) => {
 };
 
 const sanitize = (value) => value.replace(/\t/g, '\t');
+
+const codeViewerState = {
+  lines: [],
+  activeLine: null,
+};
+
+const renderCodeViewer = (sourceText) => {
+  if (!codeLineList) {
+    return;
+  }
+
+  const normalized = sourceText.replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n');
+
+  codeViewerState.lines = lines;
+  codeViewerState.activeLine = null;
+
+  codeLineList.textContent = '';
+
+  lines.forEach((line, index) => {
+    const item = document.createElement('li');
+    item.dataset.line = String(index + 1);
+
+    const number = document.createElement('span');
+    number.className = 'code-line-number';
+    number.textContent = String(index + 1).padStart(2, ' ');
+
+    const content = document.createElement('span');
+    content.className = 'code-line-content';
+    content.textContent = line.length ? line : '\u00A0';
+
+    item.append(number, content);
+    codeLineList.appendChild(item);
+  });
+};
+
+const setCodePanelHint = (hint) => {
+  if (codePanelHint) {
+    codePanelHint.textContent = hint;
+  }
+};
+
+const setActiveCodeLine = (lineNumber) => {
+  if (!codeLineList) {
+    return;
+  }
+
+  if (codeViewerState.activeLine === lineNumber) {
+    return;
+  }
+
+  if (codeViewerState.activeLine != null) {
+    const previous = codeLineList.querySelector(`[data-line="${codeViewerState.activeLine}"]`);
+    previous?.classList.remove('is-active');
+  }
+
+  if (lineNumber == null) {
+    codeViewerState.activeLine = null;
+    return;
+  }
+
+  const target = codeLineList.querySelector(`[data-line="${lineNumber}"]`);
+  if (!target) {
+    codeViewerState.activeLine = null;
+    return;
+  }
+
+  target.classList.add('is-active');
+  codeViewerState.activeLine = lineNumber;
+
+  target.scrollIntoView({
+    block: 'nearest',
+    inline: 'nearest',
+    behavior: 'smooth',
+  });
+};
 
 const splitLines = (value) => {
   return value
@@ -480,42 +561,77 @@ const parseMap = (mapText) => {
 };
 
 const preprocessSolutionTokens = (solutionText) => {
-  const withoutBlockComments = solutionText.replace(/\/\*[\s\S]*?\*\//g, '');
+  const tokens = [];
+  const lines = solutionText.replace(/\r\n?/g, '\n').split('\n');
+  let insideBlockComment = false;
 
-  const cleanedLines = withoutBlockComments
-    .split(/\r?\n/)
-    .map((line) => line.replace(/\ufeff/g, ''))
-    .map((line) => {
-      const trimmedStart = line.trimStart();
-      if (trimmedStart.startsWith('//')) {
-        return '';
+  lines.forEach((rawLine, index) => {
+    let line = rawLine.replace(/\ufeff/g, '');
+    let cursor = 0;
+    let buffer = '';
+
+    while (cursor < line.length) {
+      if (insideBlockComment) {
+        const end = line.indexOf('*/', cursor);
+        if (end === -1) {
+          cursor = line.length;
+          break;
+        }
+        insideBlockComment = false;
+        cursor = end + 2;
+        continue;
       }
-      return line.replace(/\/\/.*$/u, '');
-    });
 
-  const baseTokens = cleanedLines
-    .join('\n')
-    .replace(/([{}])/g, '\n$1\n')
-    .split(/[\r\n]+/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+      const blockStart = line.indexOf('/*', cursor);
+      const lineComment = line.indexOf('//', cursor);
 
-  const normalizedTokens = [];
-
-  for (const token of baseTokens) {
-    if (/^else\s*if\b/i.test(token)) {
-      const ifPart = token.replace(/^else\s*/i, '').trim();
-      normalizedTokens.push('else');
-      if (ifPart.length > 0) {
-        normalizedTokens.push(ifPart);
+      if (lineComment !== -1 && (blockStart === -1 || lineComment < blockStart)) {
+        buffer += line.slice(cursor, lineComment);
+        cursor = line.length;
+        break;
       }
-      continue;
+
+      if (blockStart !== -1) {
+        buffer += line.slice(cursor, blockStart);
+        const blockEnd = line.indexOf('*/', blockStart + 2);
+        if (blockEnd === -1) {
+          insideBlockComment = true;
+          cursor = line.length;
+          break;
+        }
+        cursor = blockEnd + 2;
+        continue;
+      }
+
+      buffer += line.slice(cursor);
+      cursor = line.length;
     }
 
-    normalizedTokens.push(token);
-  }
+    const cleaned = buffer.trim();
+    if (!cleaned.length) {
+      return;
+    }
 
-  return normalizedTokens;
+    const expanded = buffer
+      .replace(/([{}])/g, '\n$1\n')
+      .split(/[\r\n]+/)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+
+    expanded.forEach((part) => {
+      if (/^else\s*if\b/i.test(part)) {
+        const remainder = part.replace(/^else\s*/i, '').trim();
+        tokens.push({ text: 'else', line: index + 1 });
+        if (remainder.length > 0) {
+          tokens.push({ text: remainder, line: index + 1 });
+        }
+      } else {
+        tokens.push({ text: part, line: index + 1 });
+      }
+    });
+  });
+
+  return tokens;
 };
 
 const parseCommands = (solutionText) => {
@@ -527,11 +643,20 @@ const parseCommands = (solutionText) => {
   const functions = new Map();
   let containsDynamicControlFlow = false;
 
-  const parseCondition = (token, keyword) => {
+  const tokenAt = (index) => tokens[index] ?? null;
+  const textAt = (index) => tokenAt(index)?.text ?? null;
+  const lineAt = (index) => tokenAt(index)?.line ?? null;
+  const createSource = (index, overrideText) => ({
+    line: lineAt(index),
+    text: overrideText ?? textAt(index) ?? '',
+  });
+
+  const parseCondition = (tokenObj, keyword) => {
+    const tokenText = tokenObj?.text ?? '';
     const pattern = new RegExp(`^${keyword}\\s+(.+)$`, 'i');
-    const match = token.match(pattern);
+    const match = tokenText.match(pattern);
     if (!match) {
-      throw new Error(`${keyword} 文の条件を解析できません: ${token}`);
+      throw new Error(`${keyword} 文の条件を解析できません: ${tokenText}`);
     }
 
     const rawCondition = match[1].trim();
@@ -550,15 +675,15 @@ const parseCommands = (solutionText) => {
   };
 
   const parseBlock = (startIndex) => {
-    if (tokens[startIndex] !== '{') {
+    if (textAt(startIndex) !== '{') {
       throw new Error('開きカッコ { が必要です。');
     }
 
     const statements = [];
     let index = startIndex + 1;
 
-    while (index < tokens.length && tokens[index] !== '}') {
-      if (/^func\s+/u.test(tokens[index])) {
+    while (index < tokens.length && textAt(index) !== '}') {
+      if (/^func\s+/u.test(textAt(index) ?? '')) {
         throw new Error('関数を他の関数やループの内部で定義することはできません。');
       }
 
@@ -567,7 +692,7 @@ const parseCommands = (solutionText) => {
       index = nextIndex;
     }
 
-    if (index >= tokens.length || tokens[index] !== '}') {
+    if (index >= tokens.length || textAt(index) !== '}') {
       throw new Error('ブロックに対応する閉じカッコ } が見つかりません。');
     }
 
@@ -576,14 +701,15 @@ const parseCommands = (solutionText) => {
 
   const parseIfStatement = (currentIndex) => {
     containsDynamicControlFlow = true;
-    const condition = parseCondition(tokens[currentIndex], 'if');
+    const condition = parseCondition(tokenAt(currentIndex), 'if');
     const { statements: consequent, nextIndex: afterThen } = parseBlock(currentIndex + 1);
+    const source = createSource(currentIndex);
 
     let alternate = null;
     let cursor = afterThen;
 
-    if (cursor < tokens.length && tokens[cursor].toLowerCase() === 'else') {
-      const nextToken = tokens[cursor + 1];
+    if (cursor < tokens.length && (textAt(cursor) ?? '').toLowerCase() === 'else') {
+      const nextToken = textAt(cursor + 1);
       if (!nextToken) {
         throw new Error('else の後にブロック { ... } または if 文が必要です。');
       }
@@ -607,6 +733,7 @@ const parseCommands = (solutionText) => {
         condition,
         consequent,
         alternate: alternate ?? null,
+        source,
       },
       nextIndex: cursor,
     };
@@ -614,20 +741,21 @@ const parseCommands = (solutionText) => {
 
   const parseWhileStatement = (currentIndex) => {
     containsDynamicControlFlow = true;
-    const condition = parseCondition(tokens[currentIndex], 'while');
+    const condition = parseCondition(tokenAt(currentIndex), 'while');
     const { statements, nextIndex } = parseBlock(currentIndex + 1);
     return {
       statement: {
         kind: 'while',
         condition,
         body: statements,
+        source: createSource(currentIndex),
       },
       nextIndex,
     };
   };
 
   const parseFunctionDefinition = (currentIndex) => {
-    const token = tokens[currentIndex];
+    const token = textAt(currentIndex) ?? '';
     const match = token.match(/^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)$/u);
     if (!match) {
       throw new Error(`関数定義の構文を解析できません: ${token}`);
@@ -648,7 +776,7 @@ const parseCommands = (solutionText) => {
   };
 
   const parseExecutableStatement = (currentIndex) => {
-    const token = tokens[currentIndex];
+    const token = textAt(currentIndex);
     if (!token) {
       throw new Error('命令の解析中に入力が終了しました。');
     }
@@ -705,7 +833,7 @@ const parseCommands = (solutionText) => {
 
       const { statements, nextIndex } = parseBlock(currentIndex + 1);
       return {
-        statement: { kind: 'loop', count: iterations, body: statements },
+        statement: { kind: 'loop', count: iterations, body: statements, source: createSource(currentIndex, token) },
         nextIndex,
       };
     }
@@ -716,13 +844,13 @@ const parseCommands = (solutionText) => {
       const base = normalized.replace(/\(.*\)$/u, '');
       if (Object.values(Command).includes(base)) {
         return {
-          statement: { kind: 'command', type: base },
+          statement: { kind: 'command', type: base, source: createSource(currentIndex, token) },
           nextIndex: currentIndex + 1,
         };
       }
 
       return {
-        statement: { kind: 'call', name: base },
+        statement: { kind: 'call', name: base, source: createSource(currentIndex, token) },
         nextIndex: currentIndex + 1,
       };
     }
@@ -734,9 +862,9 @@ const parseCommands = (solutionText) => {
   let cursor = 0;
 
   while (cursor < tokens.length) {
-    const token = tokens[cursor];
+    const token = textAt(cursor);
 
-    if (/^func\s+/u.test(token)) {
+    if (/^func\s+/u.test(token ?? '')) {
       cursor = parseFunctionDefinition(cursor);
       continue;
     }
@@ -885,7 +1013,7 @@ const simulateProgram = (mapData, program) => {
 
   const functions = program.functions ?? new Map();
 
-  const captureFrame = ({ message = '', kind = 'info', label = null, command = null } = {}) => {
+  const captureFrame = ({ message = '', kind = 'info', label = null, command = null, source = null } = {}) => {
     frames.push({
       frameIndex: frames.length,
       step: executedCommands,
@@ -897,6 +1025,7 @@ const simulateProgram = (mapData, program) => {
       kind,
       label,
       command,
+      source,
     });
   };
 
@@ -909,6 +1038,7 @@ const simulateProgram = (mapData, program) => {
         kind,
         label: options.label ?? null,
         command: options.command ?? null,
+        source: options.source ?? null,
       });
     }
   };
@@ -971,12 +1101,17 @@ const simulateProgram = (mapData, program) => {
 
   const evaluateCondition = (condition) => evaluateBooleanCondition(condition, evaluatePredicate);
 
-  const executeCommand = (type) => {
+  const executeCommand = (statement) => {
+    const type = statement.type;
     if (halted) {
       return;
     }
 
-    const commandMeta = { label: `コマンド ${executedCommands + 1}`, command: type };
+    const commandMeta = {
+      label: `コマンド ${executedCommands + 1}`,
+      command: type,
+      source: statement.source ?? null,
+    };
     if (!ensureBudget(commandMeta)) {
       return;
     }
@@ -1026,6 +1161,7 @@ const simulateProgram = (mapData, program) => {
           capture: true,
           label: `ワープ W${targetCell.warpId}`,
           command: 'warp',
+          source: commandMeta.source ?? null,
         });
       }
 
@@ -1085,7 +1221,7 @@ const simulateProgram = (mapData, program) => {
       }
 
       if (statement.kind === 'command') {
-        executeCommand(statement.type);
+        executeCommand(statement);
         continue;
       }
 
@@ -1360,6 +1496,8 @@ const updateStepperUI = () => {
   stepCounterChip.textContent = commandLabel;
 
   if (totalFrames === 0) {
+    setCodePanelHint(DEFAULT_CODE_HINT);
+    setActiveCodeLine(null);
     stepStatusHeading.textContent = '結果待機中';
     stepStatusMessage.textContent = stepperState.defaultMessage;
     stepDetailMessage.textContent = DEFAULT_STEPPER_DETAIL;
@@ -1376,6 +1514,8 @@ const updateStepperUI = () => {
     return;
   }
 
+  setCodePanelHint(ACTIVE_CODE_HINT);
+
   const currentIndex = stepperState.index;
   const hasSelection = currentIndex >= 0 && currentIndex < totalFrames;
   const currentFrame = hasSelection ? stepperState.frames[currentIndex] : null;
@@ -1387,6 +1527,7 @@ const updateStepperUI = () => {
     stepIndexLabel.textContent = `0 / ${totalFrames}`;
     stepPositionLabel.textContent = '--';
     stepFacingLabel.textContent = '--';
+    setActiveCodeLine(null);
   } else if (currentFrame) {
     const heading = currentFrame.kind === 'error' ? 'エラー' : isAuto ? '自動再生中' : 'ステップ確認中';
     stepStatusHeading.textContent = heading;
@@ -1396,6 +1537,11 @@ const updateStepperUI = () => {
     stepIndexLabel.textContent = `${currentIndex + 1} / ${totalFrames}`;
     stepPositionLabel.textContent = `${currentFrame.row + 1}, ${currentFrame.col + 1}`;
     stepFacingLabel.textContent = formatFacing(currentFrame.facing);
+    if (currentFrame.source && currentFrame.source.line != null) {
+      setActiveCodeLine(currentFrame.source.line);
+    } else {
+      setActiveCodeLine(null);
+    }
   }
 
   if (stepStartButton) {
@@ -1558,6 +1704,7 @@ const handleDownloadReport = () => {
 const loadSample = () => {
   mapInput.value = SAMPLE_MAP;
   solutionInput.value = SAMPLE_SOLUTION;
+  renderCodeViewer(SAMPLE_SOLUTION);
   previewNote.textContent = 'サンプルマップを読み込みました。検証を実行して結果を確認してください。';
   runValidation();
 };
@@ -1565,6 +1712,7 @@ const loadSample = () => {
 const clearInputs = () => {
   mapInput.value = '';
   solutionInput.value = '';
+  renderCodeViewer('');
   mapCanvas.textContent = '';
   mapCanvas.style.removeProperty('--cols');
   mapSizeChip.textContent = '0 × 0';
@@ -1574,6 +1722,7 @@ const clearInputs = () => {
   updateMetrics({ steps: 0, gemsCollected: 0, totalGems: 0, switchesOpen: 0, totalSwitches: 0, errors: 0 });
   previewNote.textContent = 'マップを編集するとリアルタイムで更新されます。';
   resetStepper();
+  setCodePanelHint(DEFAULT_CODE_HINT);
 };
 
 const updateMapPreviewDebounced = (() => {
@@ -1614,6 +1763,11 @@ const updateCommandCountDebounced = (() => {
   };
 })();
 
+const handleSolutionInputChange = () => {
+  renderCodeViewer(solutionInput.value);
+  updateCommandCountDebounced();
+};
+
 const toggleLogExpansion = (expand) => {
   logList.style.maxHeight = expand ? '520px' : '320px';
 };
@@ -1628,7 +1782,9 @@ const init = () => {
     !statusCard ||
     !statusPill ||
     !statusMessage ||
-    !statusDetails
+    !statusDetails ||
+    !codeLineList ||
+    !codePanelHint
   ) {
     console.error('必要な DOM 要素が見つかりません。HTML を確認してください。');
     return;
@@ -1637,9 +1793,11 @@ const init = () => {
   updateStatusCard('idle');
   updateMetrics({ steps: 0, gemsCollected: 0, totalGems: 0, switchesOpen: 0, totalSwitches: 0, errors: 0 });
   resetStepper();
+  renderCodeViewer(solutionInput.value);
+  setCodePanelHint(DEFAULT_CODE_HINT);
 
   mapInput.addEventListener('input', updateMapPreviewDebounced);
-  solutionInput.addEventListener('input', updateCommandCountDebounced);
+  solutionInput.addEventListener('input', handleSolutionInputChange);
 
   const form = document.querySelector('#validatorForm');
   form?.addEventListener('submit', (event) => {
