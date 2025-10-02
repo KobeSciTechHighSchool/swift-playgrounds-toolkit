@@ -481,7 +481,7 @@ const parseCommands = (solutionText) => {
   let containsDynamicControlFlow = false;
 
   const parseCondition = (token, keyword) => {
-    const pattern = new RegExp(`^${keyword}\s+(.+)$`, 'i');
+    const pattern = new RegExp(`^${keyword}\\s+(.+)$`, 'i');
     const match = token.match(pattern);
     if (!match) {
       throw new Error(`${keyword} 文の条件を解析できません: ${token}`);
