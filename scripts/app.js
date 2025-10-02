@@ -709,17 +709,18 @@ const parseCommands = (solutionText) => {
     let cursor = afterThen;
 
     if (cursor < tokens.length && (textAt(cursor) ?? '').toLowerCase() === 'else') {
-      const nextToken = textAt(cursor + 1);
+      cursor += 1;
+      const nextToken = textAt(cursor);
       if (!nextToken) {
         throw new Error('else の後にブロック { ... } または if 文が必要です。');
       }
 
       if (nextToken === '{') {
-        const { statements, nextIndex } = parseBlock(cursor + 1);
+        const { statements, nextIndex } = parseBlock(cursor);
         alternate = statements;
         cursor = nextIndex;
       } else if (/^if\s+/i.test(nextToken)) {
-        const nested = parseIfStatement(cursor + 1);
+        const nested = parseIfStatement(cursor);
         alternate = [nested.statement];
         cursor = nested.nextIndex;
       } else {
