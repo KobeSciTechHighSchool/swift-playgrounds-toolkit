@@ -632,14 +632,45 @@ const parseCommands = (solutionText) => {
     }
 
     if (/^for\s+/i.test(token)) {
-      const loopMatch = token.match(/^for\s+(\d+)\s+times$/i);
-      if (!loopMatch) {
-        throw new Error(`for ループの構文を解析できません: ${token}`);
-      }
+      const normalizedToken = token.replace(/\s+/g, ' ').trim();
+      const loopMatch = normalizedToken.match(/^for\s+(\d+)\s+times$/i);
 
-      const iterations = Number.parseInt(loopMatch[1], 10);
-      if (!Number.isInteger(iterations) || iterations <= 0) {
-        throw new Error(`for ループの回数を正しく指定してください（現在: ${loopMatch[1]}）。`);
+      let iterations = null;
+
+      if (loopMatch) {
+        iterations = Number.parseInt(loopMatch[1], 10);
+        if (!Number.isInteger(iterations) || iterations <= 0) {
+          throw new Error(`for ループの回数を正しく指定してください（現在: ${loopMatch[1]}）。`);
+        }
+      } else {
+        const rangeMatch = normalizedToken.match(/^for\s+(?:[A-Za-z_][A-Za-z0-9_]*|_)\s+in\s+(-?\d+)\s*(\.\.\.|\.\.<)\s*(-?\d+)$/i);
+        if (!rangeMatch) {
+          throw new Error(`for ループの構文を解析できません: ${token}`);
+        }
+
+        const start = Number.parseInt(rangeMatch[1], 10);
+        const operator = rangeMatch[2];
+        const end = Number.parseInt(rangeMatch[3], 10);
+
+        if (!Number.isInteger(start) || !Number.isInteger(end)) {
+          throw new Error(`for ループの範囲は整数で指定してください: ${token}`);
+        }
+
+        if (operator === '...') {
+          iterations = end - start + 1;
+          if (end < start) {
+            throw new Error(`for ループの範囲を正しく指定してください（開始: ${start}, 終了: ${end}）。`);
+          }
+        } else {
+          iterations = end - start;
+          if (end <= start) {
+            throw new Error(`for ループの範囲を正しく指定してください（開始: ${start}, 終了: ${end}）。`);
+          }
+        }
+
+        if (!Number.isInteger(iterations) || iterations <= 0) {
+          throw new Error(`for ループの繰り返し回数が 0 回以下になる範囲です: ${token}`);
+        }
       }
 
       const { statements, nextIndex } = parseBlock(currentIndex + 1);
