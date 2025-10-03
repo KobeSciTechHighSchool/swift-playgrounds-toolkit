@@ -46,40 +46,6 @@
     </header>
 
     <form id="validatorForm" class="input-shell" novalidate>
-      <section class="panel-grid">
-        <article class="card legend-card" aria-labelledby="legend-title">
-          <header>
-            <h2 id="legend-title">凡例</h2>
-          </header>
-          <dl class="legend-list">
-            <div>
-              <dt><span class="legend-icon" aria-hidden="true">🧱</span><span class="legend-token">止</span></dt>
-              <dd>通行不可ブロック</dd>
-            </div>
-            <div>
-              <dt><span class="legend-icon" aria-hidden="true">⬆️</span><span class="legend-token">↑ ↓ ← →</span></dt>
-              <dd>キャラクター初期位置と向き</dd>
-            </div>
-            <div>
-              <dt><span class="legend-icon" aria-hidden="true">💎</span><span class="legend-token">♦</span></dt>
-              <dd>ジェム</dd>
-            </div>
-            <div>
-              <dt><span class="legend-icon" aria-hidden="true">🟢 / 🔴</span><span class="legend-token">〇 / ●</span>
-              </dt>
-              <dd>スイッチ（開 / 閉）</dd>
-            </div>
-            <div>
-              <dt><span class="legend-icon" aria-hidden="true">🌀</span><span class="legend-token">W1, W2 …</span></dt>
-              <dd>ワープポータル（同番号間で移動）</dd>
-            </div>
-            <div>
-              <dt><span class="legend-icon" aria-hidden="true">▫️</span><span class="legend-token">空欄</span></dt>
-              <dd>通行可能な床</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
 
       <textarea id="solutionInput" name="solution" spellcheck="false" autocomplete="off" data-gramm="false"
         rows="12" placeholder="moveForward()&#10;collectGem()" hidden></textarea>
@@ -129,9 +95,44 @@
         </div>
         <div class="map-card-actions">
           <span class="chip" id="mapSizeChip" aria-live="polite">0 × 0</span>
+          <button type="button" class="btn ghost" id="legendToggleButton" aria-haspopup="true" aria-expanded="false" aria-controls="legendPopover">凡例</button>
           <button type="button" class="btn ghost" id="mapTextEditorButton">テキストで編集</button>
         </div>
       </header>
+      <div id="legendPopover" class="legend-popover" role="region" aria-labelledby="legendPopoverTitle" hidden>
+        <div class="legend-popover__inner">
+          <div class="legend-popover__header">
+            <h3 id="legendPopoverTitle">凡例</h3>
+            <button type="button" class="btn subtle small" id="legendCloseButton" aria-label="凡例を閉じる">閉じる</button>
+          </div>
+          <dl class="legend-list">
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">🧱</span><span class="legend-token">止</span></dt>
+              <dd>通行不可ブロック</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">⬆️</span><span class="legend-token">↑ ↓ ← →</span></dt>
+              <dd>キャラクター初期位置と向き</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">💎</span><span class="legend-token">♦</span></dt>
+              <dd>ジェム</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">🟢 / 🔴</span><span class="legend-token">〇 / ●</span></dt>
+              <dd>スイッチ（開 / 閉）</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">🌀</span><span class="legend-token">W1, W2 …</span></dt>
+              <dd>ワープポータル（同番号間で移動）</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">▫️</span><span class="legend-token">空欄</span></dt>
+              <dd>通行可能な床</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
       <div class="map-size-toolbar" aria-live="polite">
         <form id="mapSizeForm" class="map-size-form" novalidate>
           <div class="map-size-fields" role="group" aria-label="マップの行数と列数">

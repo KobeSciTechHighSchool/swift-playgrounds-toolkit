@@ -45,6 +45,9 @@ const codePanelEditor = document.querySelector('#codePanelEditor');
 const mapTextEditorButton = document.querySelector('#mapTextEditorButton');
 const mapTextModal = document.querySelector('#mapTextModal');
 const mapTextModalCloseButton = document.querySelector('#mapTextModalCloseButton');
+const legendToggleButton = document.querySelector('#legendToggleButton');
+const legendPopover = document.querySelector('#legendPopover');
+const legendCloseButton = document.querySelector('#legendCloseButton');
 
 const legend = {
   stop: '止',
@@ -770,6 +773,10 @@ const mapTextModalState = {
   isOpen: false,
 };
 
+const legendState = {
+  isOpen: false,
+};
+
 const MAP_TEXT_MODAL_FOCUSABLE_SELECTOR =
   'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -805,6 +812,28 @@ const closeMapTextModal = ({ restoreFocus = false } = {}) => {
 
   mapTextModalState.previousFocus = null;
   mapTextModalState.previousOverflow = '';
+};
+
+const openLegend = () => {
+  if (!legendPopover || !legendToggleButton || legendState.isOpen) return;
+  legendPopover.removeAttribute('hidden');
+  legendToggleButton.setAttribute('aria-expanded', 'true');
+  legendState.isOpen = true;
+};
+
+const closeLegend = ({ restoreFocus = false } = {}) => {
+  if (!legendPopover || !legendToggleButton || !legendState.isOpen) return;
+  legendPopover.setAttribute('hidden', '');
+  legendToggleButton.setAttribute('aria-expanded', 'false');
+  legendState.isOpen = false;
+  if (restoreFocus) {
+    try { legendToggleButton.focus({ preventScroll: true }); } catch { legendToggleButton.focus(); }
+  }
+};
+
+const toggleLegend = () => {
+  if (!legendPopover || !legendToggleButton) return;
+  legendState.isOpen ? closeLegend() : openLegend();
 };
 
 const focusFirstElementInMapModal = () => {
@@ -1376,6 +1405,10 @@ const handleMenuKeydown = (event) => {
   }
   if (event.key === 'Escape') {
     closeMapCellMenu();
+    if (legendState.isOpen) {
+      event.stopPropagation();
+      closeLegend({ restoreFocus: true });
+    }
   }
 };
 
@@ -2741,6 +2774,18 @@ const init = () => {
       closeMapTextModal({ restoreFocus: true });
     }
   });
+
+  // Legend popover wiring
+  if (legendToggleButton && legendPopover) {
+    legendToggleButton.addEventListener('click', toggleLegend);
+    legendCloseButton?.addEventListener('click', () => closeLegend({ restoreFocus: true }));
+    document.addEventListener('click', (ev) => {
+      if (!legendState.isOpen) return;
+      const target = ev.target;
+      if (target.closest('#legendPopover') || target.closest('#legendToggleButton')) return;
+      closeLegend();
+    });
+  }
 
   const form = document.querySelector('#validatorForm');
   form?.addEventListener('submit', (event) => {
