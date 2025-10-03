@@ -84,7 +84,7 @@
     </form>
 
     <!-- Stepper content moved to fixed top bar; container kept logically via topbar -->
-
+    <button type="button" class="btn ghost" id="clearInputsButton">入力をクリア</button>
     <!-- Map and Code panels displayed side-by-side -->
     <div class="panel-grid">
     <section class="card map-card" aria-live="polite">
@@ -95,7 +95,6 @@
         <div class="map-card-actions">
           <span class="chip" id="mapSizeChip" aria-live="polite">0 × 0</span>
           <button type="button" class="btn ghost" id="legendToggleButton" aria-haspopup="true" aria-expanded="false" aria-controls="legendPopover">凡例</button>
-          <button type="button" class="btn ghost" id="clearInputsButton">入力をクリア</button>
         </div>
       </header>
       <div id="legendPopover" class="legend-popover" role="region" aria-labelledby="legendPopoverTitle" hidden>
