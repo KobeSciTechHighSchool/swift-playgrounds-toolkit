@@ -161,29 +161,29 @@
       </div>
     </section>
 
-    <!-- Independent code card placed next to the map card -->
-    <section class="card code-card" aria-live="polite">
-      <h2>コード</h2>
-      <div class="code-panel" id="codePanel">
-        <div class="code-panel-header">
-          <div class="code-panel-header-main">
-            <h3>実行中のコード</h3>
-            <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
+    <!-- Independent code card placed next to the map card; toggle moved outside the card frame -->
+    <div class="code-column">
+      <section class="card code-card" aria-live="polite">
+        <h2>コード</h2>
+        <div class="code-panel" id="codePanel">
+          <div class="code-panel-header">
+            <div class="code-panel-header-main">
+              <h3>実行中のコード</h3>
+              <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
+            </div>
+            <div class="code-panel-actions">
+              <span class="chip" id="commandCountChip" aria-live="polite">0 コマンド</span>
+            </div>
           </div>
-          <div class="code-panel-actions">
-            <span class="chip" id="commandCountChip" aria-live="polite">0 コマンド</span>
-            <button type="button" class="btn ghost" id="codePanelToggleButton" aria-pressed="false">
-              コードを編集
-            </button>
+          <div class="code-panel-body" role="region" aria-live="polite">
+            <ol class="code-viewer-list" id="codeLineList"></ol>
+            <textarea id="codePanelEditor" class="code-panel-editor" spellcheck="false" autocomplete="off"
+              data-gramm="false" hidden></textarea>
           </div>
         </div>
-        <div class="code-panel-body" role="region" aria-live="polite">
-          <ol class="code-viewer-list" id="codeLineList"></ol>
-          <textarea id="codePanelEditor" class="code-panel-editor" spellcheck="false" autocomplete="off"
-            data-gramm="false" hidden></textarea>
-        </div>
-      </div>
-    </section>
+        <button type="button" class="btn ghost external-toggle" id="codePanelToggleButton" aria-pressed="false">コードを編集</button>
+      </section>
+    </div>
     </div>
 
     <div class="map-text-modal" id="mapTextModal" role="dialog" aria-modal="true"

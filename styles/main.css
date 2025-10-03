@@ -666,6 +666,80 @@ textarea:focus {
   flex-direction: column;
   gap: 12px;
   min-width: 280px;
+  position: relative; /* allow absolute positioning of inner controls */
+}
+
+/* Container for code card plus external controls */
+/* External toggle button positioned inside the code card at bottom-left */
+.external-toggle {
+  position: absolute;
+  left: 16px; /* inside the card padding */
+  bottom: 16px;
+  z-index: 12;
+  border-radius: 999px;
+}
+
+/* Container wrapper for the code column (next to the map) */
+.code-column {
+  display: block;
+  position: relative;
+}
+
+/* Improve spacing and add a subtle divider between panels on wide screens */
+@media (min-width: 900px) {
+  .panel-grid {
+    grid-template-columns: 1fr 420px; /* map wider, code column fixed width */
+    align-items: start;
+    gap: 28px;
+  }
+
+  /* Visually separate the code column with a subtle divider and padding */
+  .code-column {
+    padding-left: 18px;
+    margin-left: -6px; /* pull divider closer to the map card for alignment */
+    border-left: 1px solid rgba(255,255,255,0.04);
+  }
+
+  /* Ensure the code card fills the available column and matches visual height */
+  .code-column .code-card {
+    width: 100%;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* Make the code panel body grow to use available space, keeping footer docked */
+  .code-column .code-panel {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px;
+  }
+
+  .code-column .code-panel-body {
+    flex: 1 1 auto;
+    max-height: none;
+    min-height: 220px;
+  }
+
+  /* Tweak external toggle positioning so it doesn't overlap content on larger cards */
+  .code-column .external-toggle {
+    left: 20px;
+    bottom: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* On small screens, place the toggle below the card in the normal flow */
+  .external-toggle {
+    position: static;
+    margin-top: 12px;
+    left: auto;
+    bottom: auto;
+    align-self: flex-start;
+  }
 }
 
 .map-size-toolbar {
@@ -1026,6 +1100,34 @@ textarea:focus {
   overflow: auto;
 }
 
+/* Make the code panel body expand so the footer sits at the bottom */
+.code-panel {
+  display: flex;
+  flex-direction: column;
+}
+.code-panel-body {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 180px;
+}
+.code-panel-body {
+  /* reserve space so bottom-left absolute button does not overlap content */
+  padding-bottom: 96px;
+}
+.code-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+/* Ensure footer button is visually anchored at the left and smaller on compact screens */
+.code-panel-footer .btn {
+  padding: 0.42rem 0.8rem;
+  font-size: 0.9rem;
+}
+
 .code-viewer-list {
   margin: 0;
   padding: 8px 0;
@@ -1253,6 +1355,8 @@ textarea:focus {
   .topbar__section--readout {
     display: none;
   }
+  /* Remove reserved bottom padding when the toggle sits below the card */
+  .code-panel-body { padding-bottom: 0; }
 }
 
 @media (prefers-color-scheme: light) {
