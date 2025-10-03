@@ -653,11 +653,36 @@ textarea:focus {
   color: var(--text-muted);
 }
 
+/* Compact buttons in headers */
+.map-card-actions .btn.small,
+.code-panel-actions .btn.small {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+}
+
+/* Tidy header copy in map card */
+.map-card-heading p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* Footer actions align right under the grid */
+.map-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
 .map-preview-grid {
   display: grid;
   gap: 20px;
-  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
-  align-items: start;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+  align-items: stretch; /* equalize column heights */
+}
+
+.map-preview-grid > * {
+  height: 100%;
 }
 
 .map-size-toolbar {
@@ -740,15 +765,17 @@ textarea:focus {
   padding: 12px;
   border-radius: var(--radius-md);
   background: rgba(9, 10, 19, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  min-height: 120px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: 240px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .map-cell {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 48px;
+  aspect-ratio: 1 / 1; /* keep square tiles */
+  min-height: 52px;
   border-radius: 14px;
   font-weight: 600;
   background: linear-gradient(145deg, rgba(88, 92, 140, 0.18), rgba(28, 31, 54, 0.42));
@@ -976,6 +1003,7 @@ textarea:focus {
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   min-height: 100%;
+  height: 100%;
 }
 
 .code-panel-header {
@@ -1014,7 +1042,8 @@ textarea:focus {
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(11, 14, 26, 0.88);
-  max-height: 420px;
+  max-height: none;
+  flex: 1 1 auto;
   overflow: auto;
 }
 
