@@ -644,14 +644,13 @@ const parseMap = (mapText, options = {}) => {
   };
 };
 
-const MAP_TOKEN_CYCLE = ['', legend.stop, legend.gem, legend.switchOpen, legend.switchClosed, ...legend.arrows];
-
 const isStartToken = (token) => legend.arrows.includes(token);
 
 const mapEditorState = {
   tokens: [],
   rows: 0,
   cols: 0,
+  cacheKey: '',
 };
 
 const refreshMapEditorState = (mapData) => {
@@ -659,6 +658,7 @@ const refreshMapEditorState = (mapData) => {
     mapEditorState.tokens = [];
     mapEditorState.rows = 0;
     mapEditorState.cols = 0;
+    mapEditorState.cacheKey = '';
     return;
   }
 
@@ -671,6 +671,7 @@ const refreshMapEditorState = (mapData) => {
       return cell?.token ?? '';
     });
   });
+  mapEditorState.cacheKey = serializeMapEditorTokens();
 };
 
 const serializeMapEditorTokens = () => {
@@ -683,42 +684,13 @@ const serializeMapEditorTokens = () => {
     .join('\n');
 };
 
-const hasAnotherStart = (rowIndex, colIndex) => {
-  return mapEditorState.tokens.some((row, rIdx) =>
-    row.some((token, cIdx) => isStartToken(token) && (rIdx !== rowIndex || cIdx !== colIndex))
-  );
-};
-
-const computeNextToken = (currentToken) => {
-  if (/^W\d+$/u.test(currentToken ?? '')) {
-    return '';
-  }
-  const normalized = currentToken ?? '';
-  const currentIndex = MAP_TOKEN_CYCLE.indexOf(normalized);
-  if (currentIndex === -1) {
-    return MAP_TOKEN_CYCLE[0];
-  }
-  const nextIndex = (currentIndex + 1) % MAP_TOKEN_CYCLE.length;
-  return MAP_TOKEN_CYCLE[nextIndex];
-};
-
-const getNextTokenForCell = (rowIndex, colIndex) => {
-  const currentToken = mapEditorState.tokens[rowIndex]?.[colIndex] ?? '';
-  let nextToken = computeNextToken(currentToken);
-
-  if (!isStartToken(nextToken) && !hasAnotherStart(rowIndex, colIndex)) {
-    nextToken = legend.arrows[0];
-  }
-
-  return nextToken;
-};
-
 const ensureMapEditorState = () => {
-  if (mapEditorState.tokens.length) {
+  const currentText = mapInput?.value ?? '';
+  if (mapEditorState.tokens.length && currentText === mapEditorState.cacheKey) {
     return;
   }
   try {
-    const mapData = parseMap(mapInput.value, {
+    const mapData = parseMap(currentText, {
       allowMissingStart: true,
       allowUnpairedPortals: true,
       allowEmpty: true,
@@ -728,7 +700,289 @@ const ensureMapEditorState = () => {
     mapEditorState.tokens = [];
     mapEditorState.rows = 0;
     mapEditorState.cols = 0;
+    mapEditorState.cacheKey = currentText;
   }
+};
+
+const updateMapInputFromEditor = () => {
+  const updatedText = serializeMapEditorTokens();
+  mapInput.value = updatedText;
+  mapEditorState.cacheKey = updatedText;
+  mapInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+};
+
+const clearOtherStarts = (rowIndex, colIndex) => {
+  mapEditorState.tokens.forEach((rowTokens, rIdx) => {
+    rowTokens.forEach((token, cIdx) => {
+      if (isStartToken(token) && (rIdx !== rowIndex || cIdx !== colIndex)) {
+        mapEditorState.tokens[rIdx][cIdx] = '';
+      }
+    });
+  });
+};
+
+const ensureAnyStartExists = (fallbackRow, fallbackCol) => {
+  const hasStart = mapEditorState.tokens.some((rowTokens) => rowTokens.some((token) => isStartToken(token)));
+  if (hasStart) {
+    return;
+  }
+  if (fallbackRow != null && fallbackCol != null) {
+    mapEditorState.tokens[fallbackRow][fallbackCol] = legend.arrows[0];
+  }
+};
+
+const mapCellMenuState = {
+  element: null,
+  list: null,
+  active: false,
+  row: null,
+  col: null,
+};
+
+const MAP_CELL_MENU_GROUPS = [
+  {
+    title: '基本タイル',
+    items: [
+      { token: '', label: '床', description: '通行可能な床マスです。', icon: mapCellIcons.floor },
+      { token: legend.stop, label: '壁', description: '通行できないブロックです。', icon: mapCellIcons.wall },
+      { token: legend.gem, label: 'ジェム', description: 'ジェムを配置します。', icon: mapCellIcons.gem },
+      {
+        token: legend.switchOpen,
+        label: 'スイッチ（開）',
+        description: '開いたスイッチを配置します。',
+        icon: mapCellIcons.switchOpen,
+      },
+      {
+        token: legend.switchClosed,
+        label: 'スイッチ（閉）',
+        description: '閉じたスイッチを配置します。',
+        icon: mapCellIcons.switchClosed,
+      },
+    ],
+  },
+  {
+    title: 'スタート位置',
+    items: [
+      {
+        token: legend.arrows[0],
+        label: '上向き',
+        description: 'スタート位置を上向きに設定します。',
+        icon: mapCellIcons.start.up,
+        isStart: true,
+      },
+      {
+        token: legend.arrows[3],
+        label: '右向き',
+        description: 'スタート位置を右向きに設定します。',
+        icon: mapCellIcons.start.right,
+        isStart: true,
+      },
+      {
+        token: legend.arrows[1],
+        label: '下向き',
+        description: 'スタート位置を下向きに設定します。',
+        icon: mapCellIcons.start.down,
+        isStart: true,
+      },
+      {
+        token: legend.arrows[2],
+        label: '左向き',
+        description: 'スタート位置を左向きに設定します。',
+        icon: mapCellIcons.start.left,
+        isStart: true,
+      },
+    ],
+  },
+  {
+    title: 'その他',
+    items: [
+      {
+        type: 'warp',
+        label: 'ワープポータル…',
+        description: 'W1 のようにポータル ID を指定します。',
+        icon: mapCellIcons.warp,
+      },
+    ],
+  },
+];
+
+const createMapCellMenuElement = () => {
+  if (mapCellMenuState.element) {
+    return mapCellMenuState.element;
+  }
+  const container = document.createElement('div');
+  container.className = 'map-cell-menu';
+  const list = document.createElement('div');
+  list.className = 'map-cell-menu__groups';
+  container.appendChild(list);
+  mapCellMenuState.element = container;
+  mapCellMenuState.list = list;
+  document.body.appendChild(container);
+  return container;
+};
+
+const closeMapCellMenu = () => {
+  if (!mapCellMenuState.element) {
+    return;
+  }
+  mapCellMenuState.element.classList.remove('is-visible');
+  mapCellMenuState.element.style.opacity = '0';
+  mapCellMenuState.active = false;
+  mapCellMenuState.row = null;
+  mapCellMenuState.col = null;
+};
+
+const handleWarpSelection = (rowIndex, colIndex) => {
+  const currentToken = mapEditorState.tokens[rowIndex]?.[colIndex] ?? '';
+  const defaultId = currentToken.match(/^W(\d+)$/u)?.[1] ?? '';
+  const input = window.prompt('ワープポータルの番号を入力してください（例: 1）', defaultId);
+  if (input == null) {
+    return;
+  }
+  const trimmed = input.trim();
+  if (!/^[0-9]+$/u.test(trimmed)) {
+    window.alert('ポータル番号は 0 以上の整数で指定してください。');
+    return;
+  }
+  mapEditorState.tokens[rowIndex][colIndex] = `W${trimmed}`;
+  updateMapInputFromEditor();
+  closeMapCellMenu();
+};
+
+const applyTokenSelection = (rowIndex, colIndex, token) => {
+  const currentToken = mapEditorState.tokens[rowIndex]?.[colIndex] ?? '';
+  if (currentToken === token) {
+    closeMapCellMenu();
+    return;
+  }
+
+  if (isStartToken(token)) {
+    clearOtherStarts(rowIndex, colIndex);
+  }
+
+  mapEditorState.tokens[rowIndex][colIndex] = token;
+  ensureAnyStartExists(rowIndex, colIndex);
+  updateMapInputFromEditor();
+  closeMapCellMenu();
+};
+
+const renderMapCellMenuGroup = (group, rowIndex, colIndex) => {
+  const fragment = document.createDocumentFragment();
+
+  const heading = document.createElement('p');
+  heading.className = 'map-cell-menu__group-title';
+  heading.textContent = group.title;
+  fragment.appendChild(heading);
+
+  const list = document.createElement('div');
+  list.className = 'map-cell-menu__group-options';
+
+  group.items.forEach((item) => {
+    if (item.type === 'warp') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'map-cell-menu__option';
+      button.dataset.optionType = 'warp';
+      if (item.icon) {
+        const icon = document.createElement('span');
+        icon.className = 'map-cell-menu__option-icon';
+        icon.textContent = item.icon;
+        button.appendChild(icon);
+      }
+      const body = document.createElement('span');
+      body.className = 'map-cell-menu__option-body';
+      body.innerHTML = `<strong>${item.label}</strong><small>${item.description}</small>`;
+      button.appendChild(body);
+      button.addEventListener('click', () => handleWarpSelection(rowIndex, colIndex));
+      list.appendChild(button);
+      return;
+    }
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'map-cell-menu__option';
+    button.dataset.optionType = 'token';
+    button.dataset.token = item.token;
+
+    if (item.icon) {
+      const icon = document.createElement('span');
+      icon.className = 'map-cell-menu__option-icon';
+      icon.textContent = item.icon;
+      button.appendChild(icon);
+    }
+
+    const body = document.createElement('span');
+    body.className = 'map-cell-menu__option-body';
+    body.innerHTML = `<strong>${item.label}</strong><small>${item.description}</small>`;
+    button.appendChild(body);
+
+    const currentToken = mapEditorState.tokens[rowIndex]?.[colIndex] ?? '';
+    if (currentToken === item.token) {
+      button.classList.add('is-selected');
+    }
+
+    button.addEventListener('click', () => applyTokenSelection(rowIndex, colIndex, item.token));
+    list.appendChild(button);
+  });
+
+  fragment.appendChild(list);
+  return fragment;
+};
+
+const renderMapCellMenu = (rowIndex, colIndex) => {
+  const container = createMapCellMenuElement();
+  if (!mapCellMenuState.list) {
+    return;
+  }
+  mapCellMenuState.list.textContent = '';
+
+  MAP_CELL_MENU_GROUPS.forEach((group, index) => {
+    mapCellMenuState.list.appendChild(renderMapCellMenuGroup(group, rowIndex, colIndex));
+    if (index < MAP_CELL_MENU_GROUPS.length - 1) {
+      const divider = document.createElement('hr');
+      divider.className = 'map-cell-menu__divider';
+      mapCellMenuState.list.appendChild(divider);
+    }
+  });
+
+  // 既存のワープがある場合は簡易表示
+  const currentToken = mapEditorState.tokens[rowIndex]?.[colIndex] ?? '';
+  if (/^W\d+$/u.test(currentToken)) {
+    const currentInfo = document.createElement('p');
+    currentInfo.className = 'map-cell-menu__current-warp';
+    currentInfo.textContent = `現在のポータル: ${currentToken}`;
+    mapCellMenuState.list.appendChild(currentInfo);
+  }
+
+  container.style.opacity = '0';
+};
+
+const positionMapCellMenu = (cellElement) => {
+  if (!mapCellMenuState.element) {
+    return;
+  }
+  const rect = cellElement.getBoundingClientRect();
+  const scrollX = window.scrollX ?? window.pageXOffset;
+  const scrollY = window.scrollY ?? window.pageYOffset;
+  const top = scrollY + rect.bottom + 8;
+  const left = scrollX + rect.left + rect.width / 2;
+  mapCellMenuState.element.style.top = `${top}px`;
+  mapCellMenuState.element.style.left = `${left}px`;
+  mapCellMenuState.element.style.opacity = '1';
+  mapCellMenuState.element.classList.add('is-visible');
+};
+
+const openMapCellMenu = (cellElement, rowIndex, colIndex) => {
+  ensureMapEditorState();
+  if (!mapEditorState.tokens[rowIndex] || mapEditorState.tokens[rowIndex][colIndex] == null) {
+    return;
+  }
+
+  renderMapCellMenu(rowIndex, colIndex);
+  positionMapCellMenu(cellElement);
+  mapCellMenuState.active = true;
+  mapCellMenuState.row = rowIndex;
+  mapCellMenuState.col = colIndex;
 };
 
 const handleMapCanvasClick = (event) => {
@@ -738,9 +992,11 @@ const handleMapCanvasClick = (event) => {
 
   const cellElement = event.target.closest('.map-cell');
   if (!cellElement) {
+    closeMapCellMenu();
     return;
   }
 
+  event.stopPropagation();
   const rowIndex = Number.parseInt(cellElement.dataset.row ?? '', 10);
   const colIndex = Number.parseInt(cellElement.dataset.col ?? '', 10);
 
@@ -748,20 +1004,36 @@ const handleMapCanvasClick = (event) => {
     return;
   }
 
-  ensureMapEditorState();
-  if (!mapEditorState.tokens[rowIndex] || mapEditorState.tokens[rowIndex][colIndex] == null) {
+  openMapCellMenu(cellElement, rowIndex, colIndex);
+};
+
+const handleDocumentClickForMenu = (event) => {
+  if (!mapCellMenuState.active) {
     return;
   }
-
-  const nextToken = getNextTokenForCell(rowIndex, colIndex);
-  if (nextToken === mapEditorState.tokens[rowIndex][colIndex]) {
+  if (event.target.closest('.map-cell-menu')) {
     return;
   }
+  if (event.target.closest('.map-cell')) {
+    return;
+  }
+  closeMapCellMenu();
+};
 
-  mapEditorState.tokens[rowIndex][colIndex] = nextToken;
-  const updatedText = serializeMapEditorTokens();
-  mapInput.value = updatedText;
-  mapInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+const handleMenuKeydown = (event) => {
+  if (!mapCellMenuState.active) {
+    return;
+  }
+  if (event.key === 'Escape') {
+    closeMapCellMenu();
+  }
+};
+
+const handleMenuScroll = () => {
+  if (!mapCellMenuState.active) {
+    return;
+  }
+  closeMapCellMenu();
 };
 
 const preprocessSolutionTokens = (solutionText) => {
@@ -1540,6 +1812,7 @@ const simulateProgram = (mapData, program) => {
 
 const renderMapPreview = (mapData, visitedPath = new Set(), activePosition = null) => {
   if (!mapCanvas) return;
+  closeMapCellMenu();
   refreshMapEditorState(mapData);
   mapCanvas.textContent = '';
   if (mapData.columns > 0) {
@@ -1950,6 +2223,7 @@ const clearInputs = () => {
   resetStepper();
   setCodePanelHint(DEFAULT_CODE_HINT);
   refreshMapEditorState({ grid: [], rows: 0, columns: 0 });
+  closeMapCellMenu();
 };
 
 const updateMapPreviewDebounced = (() => {
@@ -2032,6 +2306,10 @@ const init = () => {
   mapInput.addEventListener('input', updateMapPreviewDebounced);
   solutionInput.addEventListener('input', handleSolutionInputChange);
   mapCanvas.addEventListener('click', handleMapCanvasClick);
+  document.addEventListener('click', handleDocumentClickForMenu);
+  document.addEventListener('keydown', handleMenuKeydown);
+  window.addEventListener('scroll', handleMenuScroll, true);
+  window.addEventListener('resize', handleMenuScroll);
 
   const form = document.querySelector('#validatorForm');
   form?.addEventListener('submit', (event) => {
