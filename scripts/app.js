@@ -18,7 +18,6 @@ const metricSwitches = document.querySelector('#metricSwitches');
 const metricErrors = document.querySelector('#metricErrors');
 const issueList = document.querySelector('#issueList');
 const logList = document.querySelector('#logList');
-const runButton = document.querySelector('#runButton');
 const downloadReportButton = document.querySelector('#downloadReportButton');
 const expandLogButton = document.querySelector('#expandLogButton');
 const collapseLogButton = document.querySelector('#collapseLogButton');
@@ -48,6 +47,7 @@ const mapTextModalCloseButton = document.querySelector('#mapTextModalCloseButton
 const legendToggleButton = document.querySelector('#legendToggleButton');
 const legendPopover = document.querySelector('#legendPopover');
 const legendCloseButton = document.querySelector('#legendCloseButton');
+const statusHeaderButton = document.querySelector('#statusHeaderButton');
 
 const legend = {
   stop: '止',
@@ -414,7 +414,7 @@ const statusLabels = {
 };
 
 const summaryMessages = {
-  idle: 'マップとコードを入力し、下の「検証を実行」を押してください。',
+  idle: 'マップとコードを入力すると自動的に検証されます。',
   success: '解答はマップ上で正常に実行されました。',
   failure: '解答に問題があります。詳細を確認してください。',
   error: '解析時にエラーが発生しました。入力内容をご確認ください。',
@@ -427,7 +427,7 @@ const detailMessages = {
   error: 'タブ区切りの形式や正しい命令で構成されているかチェックしてください。',
 };
 
-const DEFAULT_STEPPER_HINT = '「検証を実行」を押すとステップ実行が有効になります。';
+const DEFAULT_STEPPER_HINT = '検証が完了するとステップ実行が利用できます。';
 const DEFAULT_STEPPER_DETAIL = 'ステップごとのメッセージがここに表示されます。';
 // 自動検証の遅延 (ms)
 const AUTO_VALIDATE_DELAY = 700;
@@ -2273,6 +2273,9 @@ const renderMapPreview = (mapData, visitedPath = new Set(), activePosition = nul
 
 const updateStatusCard = (status, details = []) => {
   statusCard.dataset.status = status;
+  if (statusHeaderButton) {
+    statusHeaderButton.dataset.status = status;
+  }
   statusPill.textContent = statusLabels[status];
   statusMessage.textContent = summaryMessages[status];
   statusDetails.textContent = detailMessages[status];
@@ -2484,7 +2487,7 @@ const prepareStepper = (mapData, simulation) => {
   stepperState.index = -1;
   stepperState.mapData = mapData;
   stepperState.hasErrors = simulation.errors.length > 0;
-  stepperState.defaultMessage = '「最初から」または「次へ」でステップ実行を開始します。';
+  stepperState.defaultMessage = '「最初」または「次へ」でステップ実行を開始します。';
   stepperState.commandTotal = simulation.stepsExecuted ?? 0;
   updateStepperUI();
 };
@@ -2500,26 +2503,28 @@ const toggleAutoPlay = () => {
     return;
   }
 
-  if (!stepperState.mapData) {
-    return;
+  if (stepperState.index < 0 || stepperState.index >= stepperState.frames.length - 1) {
+    applyStep(0);
+  } else {
+    const advance = () => {
+      if (stepperState.index >= stepperState.frames.length - 1) {
+        stopAutoPlay();
+        updateStepperUI();
+        return;
+      }
+      applyStep(stepperState.index + 1);
+    };
+    advance();
   }
 
-  const advance = () => {
+  stepperState.autoTimer = window.setInterval(() => {
     if (stepperState.index >= stepperState.frames.length - 1) {
       stopAutoPlay();
       updateStepperUI();
       return;
     }
     applyStep(stepperState.index + 1);
-  };
-
-  if (stepperState.index < 0 || stepperState.index >= stepperState.frames.length - 1) {
-    applyStep(0);
-  } else {
-    advance();
-  }
-
-  stepperState.autoTimer = window.setInterval(advance, STEP_AUTO_INTERVAL);
+  }, STEP_AUTO_INTERVAL);
   updateStepperUI();
 };
 
@@ -2590,7 +2595,7 @@ const loadSample = () => {
   if (codePanelState.mode === 'edit' && codePanelEditor) {
     codePanelEditor.value = SAMPLE_SOLUTION;
   }
-  previewNote.textContent = 'サンプルマップを読み込みました。検証を実行して結果を確認してください。';
+  previewNote.textContent = 'サンプルマップを読み込みました。自動検証の結果を確認してください。';
   runValidation();
 };
 
@@ -2619,7 +2624,7 @@ const clearInputs = () => {
 const updateMapPreviewDebounced = (() => {
   let timer = null;
   return () => {
-    resetStepper('入力が変更されたため、最新の検証を実行してください。');
+  resetStepper('入力の変更を検知。まもなく自動検証が実行されます…');
     if (timer) {
       window.clearTimeout(timer);
     }
@@ -2647,7 +2652,7 @@ const updateMapPreviewDebounced = (() => {
 const updateCommandCountDebounced = (() => {
   let timer = null;
   return () => {
-    resetStepper('入力が変更されたため、最新の検証を実行してください。');
+  resetStepper('入力の変更を検知。まもなく自動検証が実行されます…');
     if (timer) {
       window.clearTimeout(timer);
     }
@@ -2787,11 +2792,37 @@ const init = () => {
     });
   }
 
-  const form = document.querySelector('#validatorForm');
-  form?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    runValidation();
-  });
+  // Status popover wiring
+  if (statusHeaderButton && statusCard) {
+    statusHeaderButton.addEventListener('click', toggleStatusPopover);
+    document.addEventListener('click', (ev) => {
+      if (!statusPopoverState.isOpen) return;
+      const target = ev.target;
+      if (target.closest('#statusCard') || target.closest('#statusHeaderButton')) return;
+      closeStatusPopover();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && statusPopoverState.isOpen) {
+        ev.stopPropagation();
+        closeStatusPopover({ restoreFocus: true });
+      }
+    });
+    window.addEventListener('scroll', () => { if (statusPopoverState.isOpen) closeStatusPopover(); }, true);
+    window.addEventListener('resize', () => { if (statusPopoverState.isOpen) closeStatusPopover(); });
+  }
+
+  // Status popover wiring
+  if (statusHeaderButton) {
+    statusHeaderButton.addEventListener('click', toggleStatusPopover);
+    document.addEventListener('click', (ev) => {
+      if (!statusPopoverState.isOpen) return;
+      const target = ev.target;
+      if (target.closest('#statusCard') || target.closest('#statusHeaderButton')) return;
+      closeStatusPopover();
+    });
+  }
+
+  // フォーム送信による手動検証は廃止（自動検証に統一）
 
   loadSampleButton?.addEventListener('click', loadSample);
   clearInputsButton?.addEventListener('click', clearInputs);

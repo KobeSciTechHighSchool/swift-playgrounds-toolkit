@@ -12,9 +12,14 @@
   <!-- Fixed top bar for stepper controls and readouts -->
   <div class="topbar" id="stepperCard" role="region" aria-label="ステップ実行コントロール">
     <div class="topbar__section topbar__section--status">
-      <span class="chip" id="stepCounterChip" aria-live="polite">0 コマンド</span>
-      <strong class="topbar__status-heading" id="stepStatusHeading">結果待機中</strong>
-  <span class="topbar__status-message" id="stepStatusMessage">「検証を実行」を押すとステップ実行が有効になります。</span>
+      <!-- Status header moved here: acts as toggle to open the status details popover -->
+      <button type="button" id="statusHeaderButton" class="status-header status-header--button" aria-haspopup="true" aria-expanded="false" aria-controls="statusCard" title="検証ステータス">
+        <span class="status-pill" id="statusPill">未検証</span>
+        <time id="statusTimestamp" class="status-timestamp" aria-live="polite">--</time>
+      </button>
+    <span class="chip" id="stepCounterChip" aria-live="polite">0 コマンド</span>
+    <strong class="topbar__status-heading" id="stepStatusHeading">結果待機中</strong>
+  <span class="topbar__status-message" id="stepStatusMessage">検証が完了するとステップ実行が利用できます。</span>
   <span id="stepDetailMessage" class="topbar__status-detail">ステップごとのメッセージがここに表示されます。</span>
     </div>
     <div class="topbar__section topbar__section--readout" aria-live="polite">
@@ -50,13 +55,10 @@
       <textarea id="solutionInput" name="solution" spellcheck="false" autocomplete="off" data-gramm="false"
         rows="12" placeholder="moveForward()&#10;collectGem()" hidden></textarea>
 
-      <section class="card status-card" id="statusCard" data-status="idle">
-        <div class="status-header">
-          <span class="status-pill" id="statusPill">未検証</span>
-          <time id="statusTimestamp" class="status-timestamp" aria-live="polite">--</time>
-        </div>
+      <!-- Status card becomes a popover opened from the fixed header button -->
+      <section class="card status-card" id="statusCard" data-status="idle" role="region" aria-labelledby="statusMessage" hidden>
         <div class="status-summary">
-          <h2 id="statusMessage">マップとコードを入力し、下の「検証を実行」を押してください。</h2>
+          <h2 id="statusMessage">マップとコードを入力すると自動的に検証されます。</h2>
           <p id="statusDetails">サンプルデータを読み込むと動作イメージを確認できます。</p>
         </div>
         <ul class="issue-list" id="issueList" hidden></ul>
@@ -79,8 +81,7 @@
           </div>
         </div>
         <div class="status-actions">
-          <button type="submit" class="btn primary" id="runButton">検証を実行</button>
-          <button type="button" class="btn subtle" id="downloadReportButton">レポートを保存</button>
+          <!-- レポートボタンは検証ログ周辺へ移動しました -->
         </div>
       </section>
     </form>
@@ -201,6 +202,7 @@
         <div class="log-tools">
           <button type="button" class="btn ghost" id="expandLogButton">展開</button>
           <button type="button" class="btn ghost" id="collapseLogButton">折りたたむ</button>
+          <button type="button" class="btn subtle" id="downloadReportButton" title="現在の検証結果を保存">レポートを保存</button>
         </div>
       </header>
       <ol id="logList" class="log-list" aria-live="polite"></ol>

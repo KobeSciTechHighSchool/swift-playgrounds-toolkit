@@ -399,15 +399,26 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  background: linear-gradient(160deg, rgba(27, 31, 50, 0.92), rgba(11, 12, 24, 0.92));
+  background: linear-gradient(160deg, rgba(27, 31, 50, 0.96), rgba(11, 12, 24, 0.96));
 }
 
-.status-header {
-  display: flex;
+/* Status header button in topbar */
+.status-header--button {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition);
 }
+
+.status-header--button:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.24); }
+.status-header--button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .status-pill {
   display: inline-flex;
@@ -434,9 +445,32 @@ textarea:focus {
   color: var(--danger);
 }
 
+/* Reflect status on topbar header button too */
+.status-header--button[data-status="success"] .status-pill { background: rgba(60, 212, 160, 0.18); color: var(--success); }
+.status-header--button[data-status="failure"] .status-pill,
+.status-header--button[data-status="error"] .status-pill { background: rgba(255, 107, 122, 0.18); color: var(--danger); }
+
 .status-timestamp {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.4);
+}
+
+/* Popover presentation for status-card opened from topbar button */
+#statusCard[hidden] { display: none; }
+
+#statusCard {
+  position: fixed;
+  top: calc(var(--topbar-height) + 8px);
+  left: 16px;
+  width: min(560px, calc(100% - 32px));
+  z-index: 1100;
+  padding: 18px;
+  animation: status-pop-in 160ms ease-out;
+}
+
+@keyframes status-pop-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .status-summary h2 {
