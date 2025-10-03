@@ -193,7 +193,6 @@ body {
 
 .topbar .status-header--button {
   height: 36px;
-  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .topbar__section {
@@ -439,31 +438,32 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 12px;
+  border: none; /* remove border to avoid double outline */
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
   font: inherit;
   cursor: pointer;
-  transition: border-color var(--transition), background var(--transition), transform var(--transition);
+  transition: background var(--transition), transform var(--transition);
 }
 
-.status-header--button:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.24); }
+.status-header--button:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.1); }
 .status-header--button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Make inner text plain so the button itself is the only pill */
 .status-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 104px;
-  padding: 4px 12px;
-  border-radius: 999px;
+  min-width: 0;
+  padding: 0;
+  border-radius: 0;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-muted);
+  background: transparent;
+  color: inherit;
 }
 
 .status-card[data-status="success"] .status-pill {
@@ -477,15 +477,18 @@ textarea:focus {
   color: var(--danger);
 }
 
-/* Reflect status on topbar header button too */
-.status-header--button[data-status="success"] .status-pill { background: rgba(60, 212, 160, 0.18); color: var(--success); }
-.status-header--button[data-status="failure"] .status-pill,
-.status-header--button[data-status="error"] .status-pill { background: rgba(255, 107, 122, 0.18); color: var(--danger); }
-
-.status-timestamp {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.4);
+/* Reflect status using the button itself */
+.status-header--button[data-status="success"] {
+  background: rgba(60, 212, 160, 0.18);
+  color: var(--success);
 }
+.status-header--button[data-status="failure"],
+.status-header--button[data-status="error"] {
+  background: rgba(255, 107, 122, 0.18);
+  color: var(--danger);
+}
+
+/* Timestamp in header removed for simpler UI */
 
 /* Popover presentation for status-card opened from topbar button */
 #statusCard[hidden] { display: none; }

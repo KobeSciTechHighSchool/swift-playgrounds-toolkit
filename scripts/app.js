@@ -11,7 +11,6 @@ const statusCard = document.querySelector('#statusCard');
 const statusPill = document.querySelector('#statusPill');
 const statusMessage = document.querySelector('#statusMessage');
 const statusDetails = document.querySelector('#statusDetails');
-const statusTimestamp = document.querySelector('#statusTimestamp');
 const metricSteps = document.querySelector('#metricSteps');
 const metricGems = document.querySelector('#metricGems');
 const metricSwitches = document.querySelector('#metricSwitches');
@@ -25,7 +24,6 @@ const loadSampleButton = document.querySelector('#loadSampleButton');
 const clearInputsButton = document.querySelector('#clearInputsButton');
 const previewNote = document.querySelector('#previewNote');
 const stepperCard = document.querySelector('#stepperCard');
-const stepCounterChip = document.querySelector('#stepCounterChip');
 const stepStatusHeading = document.querySelector('#stepStatusHeading');
 const stepStatusMessage = document.querySelector('#stepStatusMessage');
 const stepDetailMessage = document.querySelector('#stepDetailMessage');
@@ -436,13 +434,7 @@ const DEFAULT_CODE_HINT = '入力した Swift コードがここに表示され�
 const ACTIVE_CODE_HINT = 'ステップ実行で現在のコマンド行がハイライトされます。';
 const EDITING_CODE_HINT = '編集モード: 変更は即座に反映されます。';
 
-const formatTimestamp = () => {
-  return new Intl.DateTimeFormat('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date());
-};
+// Removed timestamp display from header for a simpler layout
 
 const toRoman = (num) => {
   if (num <= 0) return '';
@@ -2310,7 +2302,7 @@ const updateStatusCard = (status, details = []) => {
   statusPill.textContent = statusLabels[status];
   statusMessage.textContent = summaryMessages[status];
   statusDetails.textContent = detailMessages[status];
-  statusTimestamp.textContent = formatTimestamp();
+  // Timestamp removed from UI
 
   issueList.textContent = '';
 
@@ -2408,8 +2400,7 @@ const updateStepperUI = () => {
   const totalFrames = stepperState.frames.length;
   const isAuto = Boolean(stepperState.autoTimer);
 
-  const commandLabel = stepperState.commandTotal > 0 ? `${stepperState.commandTotal} コマンド` : '0 コマンド';
-  stepCounterChip.textContent = commandLabel;
+  // Step counter chip removed from the fixed header
 
   if (totalFrames === 0) {
     setCodePanelHint(DEFAULT_CODE_HINT);
