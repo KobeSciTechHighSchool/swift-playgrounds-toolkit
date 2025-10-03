@@ -1,6 +1,7 @@
 :root {
   color-scheme: dark light;
   font-family: "Noto Sans JP", "Segoe UI", "Hiragino Sans", "Yu Gothic", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --topbar-height: 52px;
   --surface-0: rgba(15, 18, 29, 0.75);
   --surface-1: rgba(23, 27, 41, 0.85);
   --surface-2: rgba(37, 43, 62, 0.7);
@@ -52,7 +53,8 @@ body {
   z-index: 1;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 48px clamp(24px, 4vw, 48px) 80px;
+  /* Top padding accounts for fixed topbar height */
+  padding: calc(48px + var(--topbar-height, 0px)) clamp(24px, 4vw, 48px) 80px;
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -142,6 +144,79 @@ body {
 
 .btn.subtle {
   --btn-bg: rgba(255, 255, 255, 0.08);
+}
+
+/* Compact variant for buttons used in the top bar */
+.btn.small {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* Fixed compact top bar */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  height: var(--topbar-height);
+  padding: 8px clamp(16px, 3vw, 24px);
+  background: linear-gradient(180deg, rgba(15,18,29,0.92), rgba(15,18,29,0.86));
+  border-bottom: 1px solid var(--border-color);
+  backdrop-filter: saturate(140%) blur(14px);
+}
+
+.topbar__section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topbar__section--status {
+  gap: 10px;
+  overflow: hidden;
+}
+
+.topbar__status-heading {
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.topbar__status-message {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__status-detail {
+  color: var(--text-muted);
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+
+.topbar__section--readout {
+  gap: 14px;
+}
+
+.topbar__metric {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.topbar__metric b {
+  color: var(--text-strong);
+}
+
+.topbar__section--controls {
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .input-shell {
@@ -1049,11 +1124,16 @@ textarea:focus {
   .map-preview-grid {
     grid-template-columns: 1fr;
   }
+
+  /* Keep topbar slim: hide verbose detail text on medium screens */
+  .topbar__status-detail {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
   .app-shell {
-    padding: 32px 18px 64px;
+    padding: calc(32px + var(--topbar-height, 0px)) 18px 64px;
   }
 
   textarea {
@@ -1062,6 +1142,11 @@ textarea:focus {
 
   .status-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* On small screens, hide readout group to save space */
+  .topbar__section--readout {
+    display: none;
   }
 }
 
