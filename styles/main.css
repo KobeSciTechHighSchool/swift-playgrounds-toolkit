@@ -1188,6 +1188,9 @@ textarea:focus {
   line-height: 1.5;
   resize: vertical;
   outline: none;
+  display: block;
+  box-sizing: border-box;
+  border-radius: inherit;
 }
 
 .code-panel-editor:focus {
