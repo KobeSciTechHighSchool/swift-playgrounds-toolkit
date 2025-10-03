@@ -1258,6 +1258,69 @@ textarea:focus {
   display: none;
 }
 
+.log-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(24px, 5vw, 64px);
+  background: rgba(5, 7, 16, 0.78);
+  backdrop-filter: blur(16px);
+}
+
+.log-modal__dialog {
+  width: min(840px, 100%);
+  max-height: min(720px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--surface-1);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-lg);
+  padding: clamp(20px, 3vw, 32px);
+}
+
+.log-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.log-modal__header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.log-modal__description {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.log-modal__body {
+  flex: 1;
+  min-height: 0;
+}
+
+.log-modal__body .log-list {
+  max-height: clamp(260px, 45vh, 420px);
+  padding-right: 6px;
+}
+
+.log-modal__body .log-list:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.log-modal[hidden] {
+  display: none;
+}
+
 .log-card {
   display: flex;
   flex-direction: column;
