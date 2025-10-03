@@ -36,6 +36,8 @@ const stepAutoButton = document.querySelector('#stepAutoButton');
 const codePanel = document.querySelector('#codePanel');
 const codePanelHint = document.querySelector('#codePanelHint');
 const codeLineList = document.querySelector('#codeLineList');
+const codePanelToggleButton = document.querySelector('#codePanelToggleButton');
+const codePanelEditor = document.querySelector('#codePanelEditor');
 
 const legend = {
   stop: '止',
@@ -420,6 +422,7 @@ const DEFAULT_STEPPER_DETAIL = 'ステップごとのメッセージがここに
 const STEP_AUTO_INTERVAL = 700;
 const DEFAULT_CODE_HINT = '入力した Swift コードがここに表示されます。';
 const ACTIVE_CODE_HINT = 'ステップ実行で現在のコマンド行がハイライトされます。';
+const EDITING_CODE_HINT = '編集モード: 変更は即座に反映されます。';
 
 const formatTimestamp = () => {
   return new Intl.DateTimeFormat('ja-JP', {
@@ -465,6 +468,12 @@ const codeViewerState = {
   activeLine: null,
 };
 
+const codePanelState = {
+  mode: 'view',
+  lastViewerHint: DEFAULT_CODE_HINT,
+  isSyncing: false,
+};
+
 const renderCodeViewer = (sourceText) => {
   if (!codeLineList) {
     return;
@@ -495,9 +504,24 @@ const renderCodeViewer = (sourceText) => {
   });
 };
 
-const setCodePanelHint = (hint) => {
-  if (codePanelHint) {
-    codePanelHint.textContent = hint;
+const setCodePanelHint = (hint, options = {}) => {
+  if (!codePanelHint) {
+    return;
+  }
+
+  const { force = false, skipStore = false } = options;
+
+  if (!force && codePanelState.mode === 'edit') {
+    if (!skipStore) {
+      codePanelState.lastViewerHint = hint;
+    }
+    return;
+  }
+
+  codePanelHint.textContent = hint;
+
+  if (!skipStore) {
+    codePanelState.lastViewerHint = hint;
   }
 };
 
@@ -534,6 +558,84 @@ const setActiveCodeLine = (lineNumber) => {
     inline: 'nearest',
     behavior: 'smooth',
   });
+};
+
+const focusCodePanelEditor = () => {
+  if (!codePanelEditor) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    try {
+      codePanelEditor.focus({ preventScroll: true });
+    } catch {
+      codePanelEditor.focus();
+    }
+    const length = codePanelEditor.value.length;
+    if (typeof codePanelEditor.setSelectionRange === 'function') {
+      codePanelEditor.setSelectionRange(length, length);
+    }
+  });
+};
+
+const enterCodePanelEditMode = () => {
+  if (!codePanel || !codePanelToggleButton || !codePanelEditor || !codeLineList) {
+    return;
+  }
+  if (codePanelState.mode === 'edit') {
+    return;
+  }
+
+  codePanelState.lastViewerHint = codePanelHint?.textContent ?? codePanelState.lastViewerHint ?? DEFAULT_CODE_HINT;
+  codePanelState.mode = 'edit';
+
+  codePanel.classList.add('is-editing');
+  codeLineList.hidden = true;
+  codePanelEditor.hidden = false;
+  codePanelEditor.value = solutionInput.value;
+
+  codePanelToggleButton.textContent = '閲覧モードに戻る';
+  codePanelToggleButton.setAttribute('aria-pressed', 'true');
+
+  setCodePanelHint(EDITING_CODE_HINT, { force: true, skipStore: true });
+  focusCodePanelEditor();
+};
+
+const exitCodePanelEditMode = ({ restoreFocus = false } = {}) => {
+  if (!codePanel || !codePanelToggleButton || !codePanelEditor || !codeLineList) {
+    return;
+  }
+  if (codePanelState.mode !== 'edit') {
+    return;
+  }
+
+  codePanelState.mode = 'view';
+  codePanel.classList.remove('is-editing');
+
+  codeLineList.hidden = false;
+  codePanelEditor.hidden = true;
+  codePanelEditor.value = solutionInput.value;
+
+  codePanelToggleButton.textContent = 'コードを編集';
+  codePanelToggleButton.setAttribute('aria-pressed', 'false');
+
+  setCodePanelHint(codePanelState.lastViewerHint ?? DEFAULT_CODE_HINT, { force: true });
+  const previousActiveLine = codeViewerState.activeLine;
+  renderCodeViewer(solutionInput.value);
+  if (previousActiveLine != null) {
+    setActiveCodeLine(previousActiveLine);
+  }
+
+  if (restoreFocus) {
+    codePanelToggleButton.focus();
+  }
+};
+
+const toggleCodePanelEditMode = () => {
+  if (codePanelState.mode === 'edit') {
+    exitCodePanelEditMode();
+  } else {
+    enterCodePanelEditMode();
+  }
 };
 
 const splitLines = (value) => {
@@ -2204,6 +2306,9 @@ const loadSample = () => {
   mapInput.value = SAMPLE_MAP;
   solutionInput.value = SAMPLE_SOLUTION;
   renderCodeViewer(SAMPLE_SOLUTION);
+  if (codePanelState.mode === 'edit' && codePanelEditor) {
+    codePanelEditor.value = SAMPLE_SOLUTION;
+  }
   previewNote.textContent = 'サンプルマップを読み込みました。検証を実行して結果を確認してください。';
   runValidation();
 };
@@ -2212,6 +2317,9 @@ const clearInputs = () => {
   mapInput.value = '';
   solutionInput.value = '';
   renderCodeViewer('');
+  if (codePanelState.mode === 'edit' && codePanelEditor) {
+    codePanelEditor.value = '';
+  }
   mapCanvas.textContent = '';
   mapCanvas.style.removeProperty('--cols');
   mapSizeChip.textContent = '0 × 0';
@@ -2273,6 +2381,20 @@ const updateCommandCountDebounced = (() => {
 const handleSolutionInputChange = () => {
   renderCodeViewer(solutionInput.value);
   updateCommandCountDebounced();
+
+  if (codePanelState.mode === 'edit' && !codePanelState.isSyncing && codePanelEditor) {
+    codePanelEditor.value = solutionInput.value;
+  }
+};
+
+const syncSolutionFromEditor = () => {
+  if (!codePanelEditor) {
+    return;
+  }
+  codePanelState.isSyncing = true;
+  solutionInput.value = codePanelEditor.value;
+  handleSolutionInputChange();
+  codePanelState.isSyncing = false;
 };
 
 const toggleLogExpansion = (expand) => {
@@ -2291,7 +2413,9 @@ const init = () => {
     !statusMessage ||
     !statusDetails ||
     !codeLineList ||
-    !codePanelHint
+    !codePanelHint ||
+    !codePanelToggleButton ||
+    !codePanelEditor
   ) {
     console.error('必要な DOM 要素が見つかりません。HTML を確認してください。');
     return;
@@ -2305,6 +2429,20 @@ const init = () => {
 
   mapInput.addEventListener('input', updateMapPreviewDebounced);
   solutionInput.addEventListener('input', handleSolutionInputChange);
+  codePanelToggleButton.addEventListener('click', toggleCodePanelEditMode);
+  codePanelEditor.addEventListener('input', syncSolutionFromEditor);
+  codePanelEditor.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      exitCodePanelEditMode({ restoreFocus: true });
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      exitCodePanelEditMode({ restoreFocus: true });
+    }
+  });
   mapCanvas.addEventListener('click', handleMapCanvasClick);
   document.addEventListener('click', handleDocumentClickForMenu);
   document.addEventListener('keydown', handleMenuKeydown);

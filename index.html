@@ -174,11 +174,20 @@
         <div id="mapCanvas" class="map-canvas" role="grid" aria-label="マップのプレビュー"></div>
         <aside class="code-panel" id="codePanel">
           <div class="code-panel-header">
-            <h3>実行中のコード</h3>
-            <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
+            <div class="code-panel-header-main">
+              <h3>実行中のコード</h3>
+              <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
+            </div>
+            <div class="code-panel-actions">
+              <button type="button" class="btn ghost" id="codePanelToggleButton" aria-pressed="false">
+                コードを編集
+              </button>
+            </div>
           </div>
           <div class="code-panel-body" role="region" aria-live="polite">
             <ol class="code-viewer-list" id="codeLineList"></ol>
+            <textarea id="codePanelEditor" class="code-panel-editor" spellcheck="false" autocomplete="off"
+              data-gramm="false" hidden></textarea>
           </div>
         </aside>
       </div>
