@@ -27,40 +27,6 @@
 
     <form id="validatorForm" class="input-shell" novalidate>
       <section class="panel-grid">
-        <article class="card input-card" data-card="map">
-          <header>
-            <div>
-              <h2>マップ入力</h2>
-              <p class="description">タブ区切りでマス目を定義します。空欄は通行可能な床を表します。</p>
-            </div>
-            <div class="field-tools">
-              <span class="chip" id="mapSizeChip" aria-live="polite">0 × 0</span>
-            </div>
-          </header>
-          <label class="field">
-            <span class="field-label">マップ</span>
-            <textarea id="mapInput" name="map" spellcheck="false" autocomplete="off" data-gramm="false" rows="12"
-              placeholder="止	止	止	→			♦"></textarea>
-          </label>
-        </article>
-
-        <article class="card input-card" data-card="solution">
-          <header>
-            <div>
-              <h2>解答</h2>
-              <p class="description">1 行ごとに命令を書くか、`for` ループで繰り返しを表現できます。</p>
-            </div>
-            <div class="field-tools">
-              <span class="chip" id="commandCountChip" aria-live="polite">0 コマンド</span>
-            </div>
-          </header>
-          <label class="field">
-            <span class="field-label">Swift コード</span>
-            <textarea id="solutionInput" name="solution" spellcheck="false" autocomplete="off" data-gramm="false"
-              rows="12" placeholder="moveForward()&#10;collectGem()"></textarea>
-          </label>
-        </article>
-
         <article class="card legend-card" aria-labelledby="legend-title">
           <header>
             <h2 id="legend-title">凡例</h2>
@@ -94,6 +60,9 @@
           </dl>
         </article>
       </section>
+
+      <textarea id="solutionInput" name="solution" spellcheck="false" autocomplete="off" data-gramm="false"
+        rows="12" placeholder="moveForward()&#10;collectGem()" hidden></textarea>
 
       <section class="card status-card" id="statusCard" data-status="idle">
         <div class="status-header">
@@ -166,9 +135,15 @@
     </section>
 
     <section class="card map-card" aria-live="polite">
-      <header>
-        <h2>マッププレビュー</h2>
-        <p id="previewNote">マップを編集するとリアルタイムで更新されます。</p>
+      <header class="map-card-header">
+        <div class="map-card-heading">
+          <h2>マッププレビュー</h2>
+          <p id="previewNote">マップを編集するとリアルタイムで更新されます。</p>
+        </div>
+        <div class="map-card-actions">
+          <span class="chip" id="mapSizeChip" aria-live="polite">0 × 0</span>
+          <button type="button" class="btn ghost" id="mapTextEditorButton">テキストで編集</button>
+        </div>
       </header>
       <div class="map-size-toolbar" aria-live="polite">
         <form id="mapSizeForm" class="map-size-form" novalidate>
@@ -198,6 +173,7 @@
               <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
             </div>
             <div class="code-panel-actions">
+              <span class="chip" id="commandCountChip" aria-live="polite">0 コマンド</span>
               <button type="button" class="btn ghost" id="codePanelToggleButton" aria-pressed="false">
                 コードを編集
               </button>
@@ -211,6 +187,25 @@
         </aside>
       </div>
     </section>
+
+    <div class="map-text-modal" id="mapTextModal" role="dialog" aria-modal="true"
+      aria-labelledby="mapTextModalTitle" hidden>
+      <div class="map-text-modal__dialog">
+        <header class="map-text-modal__header">
+          <div>
+            <h2 id="mapTextModalTitle">マップをテキストで編集</h2>
+            <p class="map-text-modal__description">
+              タブ区切りでマスを指定します。変更は即座にプレビューへ反映されます。
+            </p>
+          </div>
+          <button type="button" class="btn ghost" id="mapTextModalCloseButton">閉じる</button>
+        </header>
+        <div class="map-text-modal__body">
+          <textarea id="mapInput" name="map" spellcheck="false" autocomplete="off" data-gramm="false" rows="14"
+            placeholder="止	止	止	→			♦"></textarea>
+        </div>
+      </div>
+    </div>
 
     <section class="card log-card">
       <header>

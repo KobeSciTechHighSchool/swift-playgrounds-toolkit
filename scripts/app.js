@@ -42,6 +42,9 @@ const codePanelHint = document.querySelector('#codePanelHint');
 const codeLineList = document.querySelector('#codeLineList');
 const codePanelToggleButton = document.querySelector('#codePanelToggleButton');
 const codePanelEditor = document.querySelector('#codePanelEditor');
+const mapTextEditorButton = document.querySelector('#mapTextEditorButton');
+const mapTextModal = document.querySelector('#mapTextModal');
+const mapTextModalCloseButton = document.querySelector('#mapTextModalCloseButton');
 
 const legend = {
   stop: '止',
@@ -759,6 +762,126 @@ const mapEditorState = {
   rows: 0,
   cols: 0,
   cacheKey: '',
+};
+
+const mapTextModalState = {
+  previousFocus: null,
+  previousOverflow: '',
+  isOpen: false,
+};
+
+const MAP_TEXT_MODAL_FOCUSABLE_SELECTOR =
+  'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+const getMapTextModalFocusable = () => {
+  if (!mapTextModal) {
+    return [];
+  }
+  const elements = Array.from(mapTextModal.querySelectorAll(MAP_TEXT_MODAL_FOCUSABLE_SELECTOR));
+  return elements.filter((element) => {
+    if (element.hasAttribute('hidden')) {
+      return false;
+    }
+    const style = window.getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  });
+};
+
+const closeMapTextModal = ({ restoreFocus = false } = {}) => {
+  if (!mapTextModalState.isOpen || !mapTextModal) {
+    return;
+  }
+
+  mapTextModal.setAttribute('hidden', '');
+  mapTextModal.removeAttribute('data-open');
+  mapTextModal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = mapTextModalState.previousOverflow;
+  mapTextModalState.isOpen = false;
+  mapTextEditorButton?.setAttribute('aria-expanded', 'false');
+
+  if (restoreFocus && mapTextModalState.previousFocus instanceof HTMLElement) {
+    mapTextModalState.previousFocus.focus({ preventScroll: true });
+  }
+
+  mapTextModalState.previousFocus = null;
+  mapTextModalState.previousOverflow = '';
+};
+
+const focusFirstElementInMapModal = () => {
+  if (!mapTextModalState.isOpen) {
+    return;
+  }
+  const focusable = getMapTextModalFocusable();
+  if (focusable.length === 0) {
+    mapInput?.focus({ preventScroll: true });
+    return;
+  }
+
+  const preferred = focusable.find((element) => element === mapInput);
+  const target = preferred ?? focusable[0];
+  window.requestAnimationFrame(() => {
+    if (target instanceof HTMLTextAreaElement) {
+      target.focus({ preventScroll: true });
+      target.select();
+      return;
+    }
+    target.focus({ preventScroll: true });
+  });
+};
+
+const openMapTextModal = () => {
+  if (!mapTextModal || mapTextModalState.isOpen) {
+    return;
+  }
+
+  mapTextModalState.previousFocus = document.activeElement;
+  mapTextModalState.previousOverflow = document.body.style.overflow;
+
+  mapTextModal.removeAttribute('hidden');
+  mapTextModal.setAttribute('data-open', 'true');
+  mapTextModal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  mapTextModalState.isOpen = true;
+  mapTextEditorButton?.setAttribute('aria-expanded', 'true');
+
+  focusFirstElementInMapModal();
+};
+
+const handleMapTextModalKeydown = (event) => {
+  if (!mapTextModalState.isOpen || !mapTextModal) {
+    return;
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeMapTextModal({ restoreFocus: true });
+    return;
+  }
+
+  if (event.key !== 'Tab') {
+    return;
+  }
+
+  const focusable = getMapTextModalFocusable();
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+
+  if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+    return;
+  }
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+  }
 };
 
 const MAP_EXPANSION_FILL_TOKEN = legend.stop;
@@ -2439,6 +2562,7 @@ const loadSample = () => {
 };
 
 const clearInputs = () => {
+  closeMapTextModal();
   mapInput.value = '';
   solutionInput.value = '';
   renderCodeViewer('');
@@ -2562,7 +2686,10 @@ const init = () => {
     !codeLineList ||
     !codePanelHint ||
     !codePanelToggleButton ||
-    !codePanelEditor
+    !codePanelEditor ||
+    !mapTextEditorButton ||
+    !mapTextModal ||
+    !mapTextModalCloseButton
   ) {
     console.error('必要な DOM 要素が見つかりません。HTML を確認してください。');
     return;
@@ -2593,9 +2720,27 @@ const init = () => {
   mapCanvas.addEventListener('click', handleMapCanvasClick);
   document.addEventListener('click', handleDocumentClickForMenu);
   document.addEventListener('keydown', handleMenuKeydown);
+  document.addEventListener('keydown', handleMapTextModalKeydown);
   window.addEventListener('scroll', handleMenuScroll, true);
   window.addEventListener('resize', handleMenuScroll);
   mapSizeForm?.addEventListener('submit', handleMapSizeSubmit);
+
+  mapTextEditorButton.setAttribute('aria-controls', 'mapTextModal');
+  mapTextEditorButton.setAttribute('aria-haspopup', 'dialog');
+  mapTextEditorButton.setAttribute('aria-expanded', 'false');
+  mapTextEditorButton.addEventListener('click', () => {
+    if (mapTextModalState.isOpen) {
+      closeMapTextModal({ restoreFocus: true });
+    } else {
+      openMapTextModal();
+    }
+  });
+  mapTextModalCloseButton.addEventListener('click', () => closeMapTextModal({ restoreFocus: true }));
+  mapTextModal.addEventListener('click', (event) => {
+    if (event.target === mapTextModal) {
+      closeMapTextModal({ restoreFocus: true });
+    }
+  });
 
   const form = document.querySelector('#validatorForm');
   form?.addEventListener('submit', (event) => {
