@@ -85,10 +85,12 @@
 
     <!-- Stepper content moved to fixed top bar; container kept logically via topbar -->
 
+    <!-- Map and Code panels displayed side-by-side -->
+    <div class="panel-grid">
     <section class="card map-card" aria-live="polite">
       <header class="map-card-header">
         <div class="map-card-heading">
-          <h2>マッププレビュー</h2>
+          <h2>マップ</h2>
           <p id="previewNote">マップを編集するとリアルタイムで更新されます。</p>
         </div>
         <div class="map-card-actions">
@@ -152,31 +154,36 @@
       </div>
       <div class="map-preview-grid">
         <div id="mapCanvas" class="map-canvas" role="grid" aria-label="マップのプレビュー"></div>
-        <aside class="code-panel" id="codePanel">
-          <div class="code-panel-header">
-            <div class="code-panel-header-main">
-              <h3>実行中のコード</h3>
-              <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
-            </div>
-            <div class="code-panel-actions">
-              <span class="chip" id="commandCountChip" aria-live="polite">0 コマンド</span>
-              <button type="button" class="btn ghost" id="codePanelToggleButton" aria-pressed="false">
-                コードを編集
-              </button>
-            </div>
-          </div>
-          <div class="code-panel-body" role="region" aria-live="polite">
-            <ol class="code-viewer-list" id="codeLineList"></ol>
-            <textarea id="codePanelEditor" class="code-panel-editor" spellcheck="false" autocomplete="off"
-              data-gramm="false" hidden></textarea>
-          </div>
-        </aside>
       </div>
       <!-- Move: 'テキストで編集' button relocated here so it appears below the map preview -->
       <div class="map-card-footer">
         <button type="button" class="btn ghost" id="mapTextEditorButton">テキストで編集</button>
       </div>
     </section>
+
+    <!-- Independent code card placed next to the map card -->
+    <section class="card code-card" aria-live="polite">
+      <div class="code-panel" id="codePanel">
+        <div class="code-panel-header">
+          <div class="code-panel-header-main">
+            <h3>実行中のコード</h3>
+            <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
+          </div>
+          <div class="code-panel-actions">
+            <span class="chip" id="commandCountChip" aria-live="polite">0 コマンド</span>
+            <button type="button" class="btn ghost" id="codePanelToggleButton" aria-pressed="false">
+              コードを編集
+            </button>
+          </div>
+        </div>
+        <div class="code-panel-body" role="region" aria-live="polite">
+          <ol class="code-viewer-list" id="codeLineList"></ol>
+          <textarea id="codePanelEditor" class="code-panel-editor" spellcheck="false" autocomplete="off"
+            data-gramm="false" hidden></textarea>
+        </div>
+      </div>
+    </section>
+    </div>
 
     <div class="map-text-modal" id="mapTextModal" role="dialog" aria-modal="true"
       aria-labelledby="mapTextModalTitle" hidden>
@@ -197,7 +204,7 @@
       </div>
     </div>
 
-    <section class="card log-card">
+  <section class="card log-card">
       <header>
         <h2>検証ログ</h2>
         <div class="log-tools">

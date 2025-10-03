@@ -656,8 +656,16 @@ textarea:focus {
 .map-preview-grid {
   display: grid;
   gap: 20px;
-  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
+  grid-template-columns: 1fr;
   align-items: start;
+}
+
+/* Code card layout when placed next to map-card */
+.code-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 280px;
 }
 
 .map-size-toolbar {
@@ -1220,9 +1228,7 @@ textarea:focus {
     justify-content: flex-start;
   }
 
-  .map-preview-grid {
-    grid-template-columns: 1fr;
-  }
+  .map-preview-grid { grid-template-columns: 1fr; }
 
   /* Keep topbar slim: hide verbose detail text on medium screens */
   .topbar__status-detail {
