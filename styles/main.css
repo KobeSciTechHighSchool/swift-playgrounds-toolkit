@@ -667,6 +667,15 @@ textarea:focus {
   align-items: start;
 }
 
+/* Footer area inside the map card (holds the "テキストで編集" button). */
+.map-card-footer {
+  /* add breathing room above the button so it doesn't sit flush with the preview */
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 /* Code card layout when placed next to map-card */
 .code-card {
   display: flex;
