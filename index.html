@@ -42,9 +42,6 @@
           Swift Playgrounds の「コードを学ぼう」向けに、マップと解答の整合性をブラウザ上で高速にチェックできます。
         </p>
       </div>
-      <div class="hero-actions">
-        <button type="button" class="btn ghost" id="loadSampleButton">例データを読み込む</button>
-      </div>
     </header>
 
     <form id="validatorForm" class="input-shell" novalidate>
@@ -84,8 +81,10 @@
       </section>
     </form>
 
-    <!-- Stepper content moved to fixed top bar; container kept logically via topbar -->
-    <button type="button" class="btn ghost" id="clearInputsButton">入力をクリア</button>
+    <div class="global-actions">
+      <button type="button" class="btn ghost" id="loadSampleButton">例データを読み込む</button>
+      <button type="button" class="btn ghost" id="clearInputsButton">入力をクリア</button>
+    </div>
     <!-- Map and Code panels displayed side-by-side -->
     <div class="panel-grid">
     <section class="card map-card" aria-live="polite">
@@ -226,7 +225,7 @@
     </div>
 
     <footer class="app-footer">
-      <p>© 2025 Swift Playground Toolkit. ローカルブラウザのみで動作し、入力データは保存されません。</p>
+      <p>© 2025 Swift Playground Toolkit.</p>
     </footer>
   </main>
 

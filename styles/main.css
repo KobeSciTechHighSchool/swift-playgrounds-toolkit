@@ -96,11 +96,13 @@ body {
   justify-content: flex-end;
 }
 
-/* Place the standalone "入力をクリア" button on the right when it's a direct child
-   of the .app-shell (which is a column flex container). This keeps the change
-   minimal and works responsively. */
-#clearInputsButton {
+/* Group primary form actions on the right side of the layout */
+.global-actions {
   align-self: flex-end;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .btn {
