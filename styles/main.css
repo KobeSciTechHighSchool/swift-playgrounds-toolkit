@@ -1245,6 +1245,15 @@ textarea:focus {
   resize: vertical;
 }
 
+/* Ensure the map text editor spans the full width of the dialog and
+   respects the dialog's padding (prevents it from appearing narrow). */
+.map-text-modal__body textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: block;
+}
+
 .map-text-modal[hidden] {
   display: none;
 }
