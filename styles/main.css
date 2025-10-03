@@ -1113,6 +1113,12 @@ textarea:focus {
   display: flex;
   flex-direction: column;
 }
+.code-panel.is-editing .code-viewer-list {
+  display: none;
+}
+.code-panel:not(.is-editing) .code-panel-editor {
+  display: none;
+}
 .code-panel-body {
   flex: 1 1 auto;
   max-height: none;
