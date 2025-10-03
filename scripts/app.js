@@ -3,6 +3,10 @@ const solutionInput = document.querySelector('#solutionInput');
 const mapSizeChip = document.querySelector('#mapSizeChip');
 const commandCountChip = document.querySelector('#commandCountChip');
 const mapCanvas = document.querySelector('#mapCanvas');
+const mapSizeForm = document.querySelector('#mapSizeForm');
+const mapRowsInput = document.querySelector('#mapRowsInput');
+const mapColsInput = document.querySelector('#mapColsInput');
+const mapSizeApplyButton = document.querySelector('#mapSizeApplyButton');
 const statusCard = document.querySelector('#statusCard');
 const statusPill = document.querySelector('#statusPill');
 const statusMessage = document.querySelector('#statusMessage');
@@ -757,6 +761,18 @@ const mapEditorState = {
   cacheKey: '',
 };
 
+const MAP_EXPANSION_FILL_TOKEN = legend.stop;
+const MIN_MAP_DIMENSION = 1;
+
+const updateMapSizeControls = (rows, cols) => {
+  if (!mapRowsInput || !mapColsInput) {
+    return;
+  }
+  const hasValidSize = rows >= MIN_MAP_DIMENSION && cols >= MIN_MAP_DIMENSION;
+  mapRowsInput.value = hasValidSize ? String(rows) : '';
+  mapColsInput.value = hasValidSize ? String(cols) : '';
+};
+
 const refreshMapEditorState = (mapData) => {
   if (!mapData || !Array.isArray(mapData.grid)) {
     mapEditorState.tokens = [];
@@ -776,6 +792,7 @@ const refreshMapEditorState = (mapData) => {
     });
   });
   mapEditorState.cacheKey = serializeMapEditorTokens();
+  updateMapSizeControls(mapEditorState.rows, mapEditorState.cols);
 };
 
 const serializeMapEditorTokens = () => {
@@ -833,6 +850,112 @@ const ensureAnyStartExists = (fallbackRow, fallbackCol) => {
   if (fallbackRow != null && fallbackCol != null) {
     mapEditorState.tokens[fallbackRow][fallbackCol] = legend.arrows[0];
   }
+};
+
+const applyMapResize = (targetRows, targetCols) => {
+  ensureMapEditorState();
+
+  const previousRows = mapEditorState.rows >= MIN_MAP_DIMENSION ? mapEditorState.rows : 0;
+  const previousCols = mapEditorState.cols >= MIN_MAP_DIMENSION ? mapEditorState.cols : 0;
+  const rows = Math.max(MIN_MAP_DIMENSION, Math.floor(targetRows));
+  const cols = Math.max(MIN_MAP_DIMENSION, Math.floor(targetCols));
+
+  if (rows === previousRows && cols === previousCols) {
+    if (previewNote) {
+      previewNote.textContent = `マップサイズはすでに ${rows} × ${cols} です。`;
+    }
+    return;
+  }
+
+  const sourceTokens = Array.isArray(mapEditorState.tokens) ? mapEditorState.tokens : [];
+  const resized = [];
+
+  const preservedRowCount = Math.min(sourceTokens.length, rows);
+  for (let rowIndex = 0; rowIndex < preservedRowCount; rowIndex += 1) {
+    const rowTokens = Array.isArray(sourceTokens[rowIndex]) ? sourceTokens[rowIndex] : [];
+    const nextRow = rowTokens.slice(0, cols);
+    while (nextRow.length < cols) {
+      nextRow.push(MAP_EXPANSION_FILL_TOKEN);
+    }
+    resized.push(nextRow);
+  }
+
+  for (let rowIndex = resized.length; rowIndex < rows; rowIndex += 1) {
+    resized.push(Array.from({ length: cols }, () => MAP_EXPANSION_FILL_TOKEN));
+  }
+
+  mapEditorState.tokens = resized;
+  mapEditorState.rows = rows;
+  mapEditorState.cols = cols;
+  if (mapSizeChip) {
+    mapSizeChip.textContent = `${rows} × ${cols}`;
+  }
+
+  ensureAnyStartExists(0, 0);
+  closeMapCellMenu();
+  updateMapSizeControls(rows, cols);
+  updateMapInputFromEditor();
+
+  if (previewNote) {
+    const changeSummary = [];
+    if (rows > previousRows) {
+      changeSummary.push('行を拡張');
+    } else if (rows < previousRows) {
+      changeSummary.push('行を縮小');
+    }
+    if (cols > previousCols) {
+      changeSummary.push('列を拡張');
+    } else if (cols < previousCols) {
+      changeSummary.push('列を縮小');
+    }
+
+    const expanded = rows > previousRows || cols > previousCols;
+    const shrunk = rows < previousRows || cols < previousCols;
+    const suffix = expanded && shrunk
+      ? '拡張部分は通行不可ブロックで埋め、範囲外のマスは無効化しました。'
+      : expanded
+        ? '拡張部分は通行不可ブロックで埋めています。'
+        : '範囲外のマスは無効化しました。';
+    const headline = changeSummary.length ? changeSummary.join('・') : 'サイズを調整';
+    previewNote.textContent = `${headline}し、マップサイズを ${rows} × ${cols} に更新しました。${suffix}`;
+  }
+};
+
+const handleMapSizeSubmit = (event) => {
+  if (event) {
+    event.preventDefault();
+  }
+  if (!mapRowsInput || !mapColsInput) {
+    return;
+  }
+
+  ensureMapEditorState();
+
+  const currentRows = mapEditorState.rows >= MIN_MAP_DIMENSION ? mapEditorState.rows : MIN_MAP_DIMENSION;
+  const currentCols = mapEditorState.cols >= MIN_MAP_DIMENSION ? mapEditorState.cols : MIN_MAP_DIMENSION;
+
+  const rawRows = mapRowsInput.value.trim();
+  const rawCols = mapColsInput.value.trim();
+
+  const parsedRows = rawRows.length ? Number.parseInt(rawRows, 10) : currentRows;
+  const parsedCols = rawCols.length ? Number.parseInt(rawCols, 10) : currentCols;
+
+  if (!Number.isInteger(parsedRows) || parsedRows < MIN_MAP_DIMENSION) {
+    window.alert('行数は 1 以上の整数で指定してください。');
+    updateMapSizeControls(mapEditorState.rows, mapEditorState.cols);
+    return;
+  }
+
+  if (!Number.isInteger(parsedCols) || parsedCols < MIN_MAP_DIMENSION) {
+    window.alert('列数は 1 以上の整数で指定してください。');
+    updateMapSizeControls(mapEditorState.rows, mapEditorState.cols);
+    return;
+  }
+
+  mapRowsInput.value = String(parsedRows);
+  mapColsInput.value = String(parsedCols);
+
+  applyMapResize(parsedRows, parsedCols);
 };
 
 const mapCellMenuState = {
@@ -2472,6 +2595,7 @@ const init = () => {
   document.addEventListener('keydown', handleMenuKeydown);
   window.addEventListener('scroll', handleMenuScroll, true);
   window.addEventListener('resize', handleMenuScroll);
+  mapSizeForm?.addEventListener('submit', handleMapSizeSubmit);
 
   const form = document.querySelector('#validatorForm');
   form?.addEventListener('submit', (event) => {

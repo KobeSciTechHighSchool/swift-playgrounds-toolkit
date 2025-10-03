@@ -170,6 +170,25 @@
         <h2>マッププレビュー</h2>
         <p id="previewNote">マップを編集するとリアルタイムで更新されます。</p>
       </header>
+      <div class="map-size-toolbar" aria-live="polite">
+        <form id="mapSizeForm" class="map-size-form" novalidate>
+          <div class="map-size-fields" role="group" aria-label="マップの行数と列数">
+            <label class="map-size-field" for="mapRowsInput">
+              <span>行</span>
+              <input type="number" inputmode="numeric" min="1" id="mapRowsInput" name="rows" placeholder="行数" />
+            </label>
+            <span class="map-size-multiply" aria-hidden="true">×</span>
+            <label class="map-size-field" for="mapColsInput">
+              <span>列</span>
+              <input type="number" inputmode="numeric" min="1" id="mapColsInput" name="cols" placeholder="列数" />
+            </label>
+          </div>
+          <div class="map-size-actions">
+            <button type="submit" class="btn subtle" id="mapSizeApplyButton">サイズを更新</button>
+          </div>
+        </form>
+        <p class="map-size-note">左上を基点に拡縮し、拡張部分は通行不可ブロックで埋め、縮小で外れたマスは無効化します。</p>
+      </div>
       <div class="map-preview-grid">
         <div id="mapCanvas" class="map-canvas" role="grid" aria-label="マップのプレビュー"></div>
         <aside class="code-panel" id="codePanel">
