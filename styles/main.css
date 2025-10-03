@@ -669,14 +669,13 @@ textarea:focus {
   position: relative; /* allow absolute positioning of inner controls */
 }
 
-/* Container for code card plus external controls */
-/* External toggle button positioned inside the code card at bottom-left */
-.external-toggle {
-  position: absolute;
-  left: 16px; /* inside the card padding */
-  bottom: 16px;
-  z-index: 12;
-  border-radius: 999px;
+/* Code card header for placing the edit button at top-right */
+.code-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
 }
 
 /* Container wrapper for the code column (next to the map) */
@@ -725,21 +724,12 @@ textarea:focus {
   }
 
   /* Tweak external toggle positioning so it doesn't overlap content on larger cards */
-  .code-column .external-toggle {
-    left: 20px;
-    bottom: 20px;
-  }
+  /* external-toggle no longer used */
 }
 
 @media (max-width: 768px) {
   /* On small screens, place the toggle below the card in the normal flow */
-  .external-toggle {
-    position: static;
-    margin-top: 12px;
-    left: auto;
-    bottom: auto;
-    align-self: flex-start;
-  }
+  /* external-toggle no longer used */
 }
 
 .map-size-toolbar {
@@ -1110,10 +1100,7 @@ textarea:focus {
   max-height: none;
   min-height: 180px;
 }
-.code-panel-body {
-  /* reserve space so bottom-left absolute button does not overlap content */
-  padding-bottom: 96px;
-}
+/* padding-bottom reservation removed; no override needed */
 .code-panel-footer {
   display: flex;
   align-items: center;

@@ -164,7 +164,10 @@
     <!-- Independent code card placed next to the map card; toggle moved outside the card frame -->
     <div class="code-column">
       <section class="card code-card" aria-live="polite">
-        <h2>コード</h2>
+        <header class="code-card-header">
+          <h2>コード</h2>
+          <button type="button" class="btn ghost" id="codePanelToggleButton" aria-pressed="false">コードを編集</button>
+        </header>
         <div class="code-panel" id="codePanel">
           <div class="code-panel-header">
             <div class="code-panel-header-main">
@@ -181,7 +184,6 @@
               data-gramm="false" hidden></textarea>
           </div>
         </div>
-        <button type="button" class="btn ghost external-toggle" id="codePanelToggleButton" aria-pressed="false">コードを編集</button>
       </section>
     </div>
     </div>
