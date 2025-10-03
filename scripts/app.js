@@ -646,7 +646,6 @@ const toggleCodePanelEditMode = () => {
 const splitLines = (value) => {
   return value
     .split(/[\r\n]+/)
-    .map((line) => line.trimEnd())
     .filter((line) => line.length > 0);
 };
 
@@ -685,7 +684,8 @@ const parseMap = (mapText, options = {}) => {
   rows.forEach((rowValues, rowIndex) => {
     const gridRow = [];
     for (let colIndex = 0; colIndex < columnCount; colIndex += 1) {
-      const token = rowValues[colIndex] ?? '';
+      const rawToken = rowValues[colIndex] ?? '';
+      const token = rawToken.trim();
       const cell = {
         token,
         row: rowIndex,
