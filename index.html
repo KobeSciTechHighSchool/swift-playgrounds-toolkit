@@ -79,6 +79,7 @@
         </div>
         <div class="status-actions">
           <!-- レポートボタンは検証ログ周辺へ移動しました -->
+          <button type="button" class="btn subtle" id="statusLogButton">検証ログ</button>
         </div>
       </section>
     </form>
@@ -204,17 +205,25 @@
       </div>
     </div>
 
-  <section class="card log-card">
-      <header>
-        <h2>検証ログ</h2>
-        <div class="log-tools">
-          <button type="button" class="btn ghost" id="expandLogButton">展開</button>
-          <button type="button" class="btn ghost" id="collapseLogButton">折りたたむ</button>
-          <button type="button" class="btn subtle" id="downloadReportButton" title="現在の検証結果を保存">レポートを保存</button>
+    <div class="log-modal" id="logModal" role="dialog" aria-modal="true" aria-labelledby="logModalTitle" hidden>
+      <div class="log-modal__dialog">
+        <header class="log-modal__header">
+          <div>
+            <h2 id="logModalTitle">検証ログ</h2>
+            <p class="log-modal__description">実行ログとステップ情報を確認できます。</p>
+          </div>
+          <div class="log-tools">
+            <button type="button" class="btn ghost" id="expandLogButton">展開</button>
+            <button type="button" class="btn ghost" id="collapseLogButton">折りたたむ</button>
+            <button type="button" class="btn subtle" id="downloadReportButton" title="現在の検証結果を保存">レポートを保存</button>
+            <button type="button" class="btn ghost" id="logModalCloseButton">閉じる</button>
+          </div>
+        </header>
+        <div class="log-modal__body">
+          <ol id="logList" class="log-list" aria-live="polite"></ol>
         </div>
-      </header>
-      <ol id="logList" class="log-list" aria-live="polite"></ol>
-    </section>
+      </div>
+    </div>
 
     <footer class="app-footer">
       <p>© 2025 Swift Playground Toolkit. ローカルブラウザのみで動作し、入力データは保存されません。</p>

@@ -44,6 +44,9 @@ const legendToggleButton = document.querySelector('#legendToggleButton');
 const legendPopover = document.querySelector('#legendPopover');
 const legendCloseButton = document.querySelector('#legendCloseButton');
 const statusHeaderButton = document.querySelector('#statusHeaderButton');
+const statusLogButton = document.querySelector('#statusLogButton');
+const logModal = document.querySelector('#logModal');
+const logModalCloseButton = document.querySelector('#logModalCloseButton');
 
 const legend = {
   stop: '止',
@@ -763,6 +766,12 @@ const mapTextModalState = {
   isOpen: false,
 };
 
+const logModalState = {
+  previousFocus: null,
+  previousOverflow: '',
+  isOpen: false,
+};
+
 const legendState = {
   isOpen: false,
 };
@@ -779,6 +788,16 @@ const getMapTextModalFocusable = () => {
     if (element.hasAttribute('hidden')) {
       return false;
     }
+    const style = window.getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  });
+};
+
+const getLogModalFocusable = () => {
+  if (!logModal) return [];
+  const elements = Array.from(logModal.querySelectorAll(MAP_TEXT_MODAL_FOCUSABLE_SELECTOR));
+  return elements.filter((element) => {
+    if (element.hasAttribute('hidden')) return false;
     const style = window.getComputedStyle(element);
     return style.display !== 'none' && style.visibility !== 'hidden';
   });
@@ -895,6 +914,75 @@ const openMapTextModal = () => {
   mapTextEditorButton?.setAttribute('aria-expanded', 'true');
 
   focusFirstElementInMapModal();
+};
+
+const focusFirstElementInLogModal = () => {
+  if (!logModalState.isOpen) return;
+  const focusable = getLogModalFocusable();
+  if (focusable.length === 0) {
+    // try focusing the log list if available
+    logList?.focus({ preventScroll: true });
+    return;
+  }
+  const target = focusable[0];
+  window.requestAnimationFrame(() => {
+    try { target.focus({ preventScroll: true }); } catch { target.focus(); }
+  });
+};
+
+const openLogModal = () => {
+  if (!logModal || logModalState.isOpen) return;
+  logModalState.previousFocus = document.activeElement;
+  logModalState.previousOverflow = document.body.style.overflow;
+  logModal.removeAttribute('hidden');
+  logModal.setAttribute('data-open', 'true');
+  logModal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  logModalState.isOpen = true;
+  statusLogButton?.setAttribute('aria-expanded', 'true');
+  focusFirstElementInLogModal();
+};
+
+const closeLogModal = ({ restoreFocus = false } = {}) => {
+  if (!logModalState.isOpen || !logModal) return;
+  logModal.setAttribute('hidden', '');
+  logModal.removeAttribute('data-open');
+  logModal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = logModalState.previousOverflow;
+  logModalState.isOpen = false;
+  statusLogButton?.setAttribute('aria-expanded', 'false');
+  if (restoreFocus && logModalState.previousFocus instanceof HTMLElement) {
+    try { logModalState.previousFocus.focus({ preventScroll: true }); } catch { logModalState.previousFocus.focus(); }
+  }
+  logModalState.previousFocus = null;
+  logModalState.previousOverflow = '';
+};
+
+const handleLogModalKeydown = (event) => {
+  if (!logModalState.isOpen || !logModal) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeLogModal({ restoreFocus: true });
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const focusable = getLogModalFocusable();
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+    return;
+  }
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+  }
 };
 
 const handleMapTextModalKeydown = (event) => {
@@ -2746,6 +2834,7 @@ const init = () => {
   document.addEventListener('click', handleDocumentClickForMenu);
   document.addEventListener('keydown', handleMenuKeydown);
   document.addEventListener('keydown', handleMapTextModalKeydown);
+  document.addEventListener('keydown', handleLogModalKeydown);
   window.addEventListener('scroll', handleMenuScroll, true);
   window.addEventListener('resize', handleMenuScroll);
   mapSizeForm?.addEventListener('submit', handleMapSizeSubmit);
@@ -2764,6 +2853,26 @@ const init = () => {
   mapTextModal.addEventListener('click', (event) => {
     if (event.target === mapTextModal) {
       closeMapTextModal({ restoreFocus: true });
+    }
+  });
+
+  // Log modal wiring (opened from status card button)
+  if (statusLogButton) {
+    statusLogButton.setAttribute('aria-controls', 'logModal');
+    statusLogButton.setAttribute('aria-haspopup', 'dialog');
+    statusLogButton.setAttribute('aria-expanded', 'false');
+    statusLogButton.addEventListener('click', () => {
+      if (logModalState.isOpen) {
+        closeLogModal({ restoreFocus: true });
+      } else {
+        openLogModal();
+      }
+    });
+  }
+  logModalCloseButton?.addEventListener('click', () => closeLogModal({ restoreFocus: true }));
+  logModal?.addEventListener('click', (event) => {
+    if (event.target === logModal) {
+      closeLogModal({ restoreFocus: true });
     }
   });
 
