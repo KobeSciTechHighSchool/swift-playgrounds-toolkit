@@ -419,6 +419,8 @@ const detailMessages = {
 
 const DEFAULT_STEPPER_HINT = '「検証を実行」を押すとステップ実行が有効になります。';
 const DEFAULT_STEPPER_DETAIL = 'ステップごとのメッセージがここに表示されます。';
+// 自動検証の遅延 (ms)
+const AUTO_VALIDATE_DELAY = 700;
 const STEP_AUTO_INTERVAL = 700;
 const DEFAULT_CODE_HINT = '入力した Swift コードがここに表示されます。';
 const ACTIVE_CODE_HINT = 'ステップ実行で現在のコマンド行がハイライトされます。';
@@ -2356,6 +2358,8 @@ const updateMapPreviewDebounced = (() => {
         mapCanvas.style.removeProperty('--cols');
         refreshMapEditorState({ grid: [], rows: 0, columns: 0 });
       }
+      // マップ編集後は自動検証をトリガー（無効なマップでも検証してエラーメッセージを表示したい）
+      autoValidateDebounced();
     }, 250);
   };
 })();
@@ -2374,7 +2378,27 @@ const updateCommandCountDebounced = (() => {
       } catch {
         commandCountChip.textContent = '— コマンド';
       }
+      // コード編集後も自動検証をトリガー
+      autoValidateDebounced();
     }, 250);
+  };
+})();
+
+// 入力変更に対して検証を自動実行するためのデバウンス関数
+const autoValidateDebounced = (() => {
+  let timer = null;
+  return () => {
+    if (timer) {
+      window.clearTimeout(timer);
+    }
+    timer = window.setTimeout(() => {
+      // フォーム送信と同じ効果を得るため runValidation を呼び出す
+      try {
+        runValidation();
+      } catch {
+        // runValidation 内でエラー処理するためここでは何もしない
+      }
+    }, AUTO_VALIDATE_DELAY);
   };
 })();
 
