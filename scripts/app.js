@@ -22,7 +22,6 @@ const expandLogButton = document.querySelector('#expandLogButton');
 const collapseLogButton = document.querySelector('#collapseLogButton');
 const loadSampleButton = document.querySelector('#loadSampleButton');
 const clearInputsButton = document.querySelector('#clearInputsButton');
-const previewNote = document.querySelector('#previewNote');
 const stepperCard = document.querySelector('#stepperCard');
 const stepStatusHeading = document.querySelector('#stepStatusHeading');
 const stepStatusMessage = document.querySelector('#stepStatusMessage');
@@ -1036,9 +1035,6 @@ const applyMapResize = (targetRows, targetCols) => {
   const cols = Math.max(MIN_MAP_DIMENSION, Math.floor(targetCols));
 
   if (rows === previousRows && cols === previousCols) {
-    if (previewNote) {
-      previewNote.textContent = `マップサイズはすでに ${rows} × ${cols} です。`;
-    }
     return;
   }
 
@@ -1071,29 +1067,7 @@ const applyMapResize = (targetRows, targetCols) => {
   updateMapSizeControls(rows, cols);
   updateMapInputFromEditor();
 
-  if (previewNote) {
-    const changeSummary = [];
-    if (rows > previousRows) {
-      changeSummary.push('行を拡張');
-    } else if (rows < previousRows) {
-      changeSummary.push('行を縮小');
-    }
-    if (cols > previousCols) {
-      changeSummary.push('列を拡張');
-    } else if (cols < previousCols) {
-      changeSummary.push('列を縮小');
-    }
-
-    const expanded = rows > previousRows || cols > previousCols;
-    const shrunk = rows < previousRows || cols < previousCols;
-    const suffix = expanded && shrunk
-      ? '拡張部分は通行不可ブロックで埋め、範囲外のマスは無効化しました。'
-      : expanded
-        ? '拡張部分は通行不可ブロックで埋めています。'
-        : '範囲外のマスは無効化しました。';
-    const headline = changeSummary.length ? changeSummary.join('・') : 'サイズを調整';
-    previewNote.textContent = `${headline}し、マップサイズを ${rows} × ${cols} に更新しました。${suffix}`;
-  }
+  // Size updated; UI chips and editors already reflect the new size.
 };
 
 const handleMapSizeSubmit = (event) => {
@@ -2580,11 +2554,7 @@ const runValidation = () => {
     renderMapPreview(mapData, simulation.visitedPath);
     prepareStepper(mapData, simulation);
 
-    previewNote.textContent = hasErrors
-      ? '訪問した経路を確認し、ログで問題のステップを参照してください。'
-      : program.metadata.hasDynamicControlFlow
-        ? '条件分岐やループの判定ログが追加されました。ステップ実行で分岐ごとの移動も追跡できます。'
-        : '訪問経路がハイライトされました。ステップ実行でコマンドごとの移動も確認できます。';
+    // Validation completed; update status card, metrics, preview and stepper above.
   } catch (error) {
     updateStatusCard('error', [error.message]);
     updateMetrics({ steps: 0, gemsCollected: 0, totalGems: 0, switchesOpen: 0, totalSwitches: 0, errors: 1 });
@@ -2617,7 +2587,7 @@ const loadSample = () => {
   if (codePanelState.mode === 'edit' && codePanelEditor) {
     codePanelEditor.value = SAMPLE_SOLUTION;
   }
-  previewNote.textContent = 'サンプルマップを読み込みました。自動検証の結果を確認してください。';
+  // Sample loaded; run validation to update UI.
   runValidation();
 };
 
@@ -2636,7 +2606,7 @@ const clearInputs = () => {
   resetLog();
   updateStatusCard('idle');
   updateMetrics({ steps: 0, gemsCollected: 0, totalGems: 0, switchesOpen: 0, totalSwitches: 0, errors: 0 });
-  previewNote.textContent = 'マップを編集するとリアルタイムで更新されます。';
+  // Inputs cleared; UI will prompt user naturally through status card and chips.
   resetStepper();
   setCodePanelHint(DEFAULT_CODE_HINT);
   refreshMapEditorState({ grid: [], rows: 0, columns: 0 });
