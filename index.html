@@ -1,183 +1,207 @@
 <!DOCTYPE html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Swift Playground マップ検証ツール</title>
-    <link rel="stylesheet" href="styles/main.css" />
-  </head>
-  <body>
-    <div class="ambient"></div>
-    <main class="app-shell" aria-labelledby="app-title">
-      <header class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Swift Playgrounds Toolkit</p>
-          <h1 id="app-title">Swift Playground マップ検証ツール</h1>
-          <p class="lead">
-            Swift Playgrounds の「コードを学ぼう」向けに、マップと解答の整合性をブラウザ上で高速にチェックできます。
-          </p>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swift Playground マップ検証ツール</title>
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+
+<body>
+  <div class="ambient"></div>
+  <main class="app-shell" aria-labelledby="app-title">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Swift Playgrounds Toolkit</p>
+        <h1 id="app-title">Swift Playground マップ検証ツール</h1>
+        <p class="lead">
+          Swift Playgrounds の「コードを学ぼう」向けに、マップと解答の整合性をブラウザ上で高速にチェックできます。
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button type="button" class="btn ghost" id="loadSampleButton">例データを読み込む</button>
+        <button type="button" class="btn ghost" id="clearInputsButton">入力をクリア</button>
+      </div>
+    </header>
+
+    <form id="validatorForm" class="input-shell" novalidate>
+      <section class="panel-grid">
+        <article class="card input-card" data-card="map">
+          <header>
+            <div>
+              <h2>マップ入力</h2>
+              <p class="description">タブ区切りでマス目を定義します。空欄は通行可能な床を表します。</p>
+            </div>
+            <div class="field-tools">
+              <span class="chip" id="mapSizeChip" aria-live="polite">0 × 0</span>
+            </div>
+          </header>
+          <label class="field">
+            <span class="field-label">マップ</span>
+            <textarea id="mapInput" name="map" spellcheck="false" autocomplete="off" data-gramm="false" rows="12"
+              placeholder="止	止	止	→			♦"></textarea>
+          </label>
+        </article>
+
+        <article class="card input-card" data-card="solution">
+          <header>
+            <div>
+              <h2>解答</h2>
+              <p class="description">1 行ごとに命令を書くか、`for` ループで繰り返しを表現できます。</p>
+            </div>
+            <div class="field-tools">
+              <span class="chip" id="commandCountChip" aria-live="polite">0 コマンド</span>
+            </div>
+          </header>
+          <label class="field">
+            <span class="field-label">Swift コード</span>
+            <textarea id="solutionInput" name="solution" spellcheck="false" autocomplete="off" data-gramm="false"
+              rows="12" placeholder="moveForward()&#10;collectGem()"></textarea>
+          </label>
+        </article>
+
+        <article class="card legend-card" aria-labelledby="legend-title">
+          <header>
+            <h2 id="legend-title">凡例</h2>
+          </header>
+          <dl class="legend-list">
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">🧱</span><span class="legend-token">止</span></dt>
+              <dd>通行不可ブロック</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">⬆️</span><span class="legend-token">↑ ↓ ← →</span></dt>
+              <dd>キャラクター初期位置と向き</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">💎</span><span class="legend-token">♦</span></dt>
+              <dd>ジェム</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">🟢 / 🔴</span><span class="legend-token">〇 / ●</span>
+              </dt>
+              <dd>スイッチ（開 / 閉）</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">🌀</span><span class="legend-token">W1, W2 …</span></dt>
+              <dd>ワープポータル（同番号間で移動）</dd>
+            </div>
+            <div>
+              <dt><span class="legend-icon" aria-hidden="true">▫️</span><span class="legend-token">空欄</span></dt>
+              <dd>通行可能な床</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="card status-card" id="statusCard" data-status="idle">
+        <div class="status-header">
+          <span class="status-pill" id="statusPill">未検証</span>
+          <time id="statusTimestamp" class="status-timestamp" aria-live="polite">--</time>
         </div>
-        <div class="hero-actions">
-          <button type="button" class="btn ghost" id="loadSampleButton">例データを読み込む</button>
-          <button type="button" class="btn ghost" id="clearInputsButton">入力をクリア</button>
+        <div class="status-summary">
+          <h2 id="statusMessage">マップとコードを入力し、下の「検証を実行」を押してください。</h2>
+          <p id="statusDetails">サンプルデータを読み込むと動作イメージを確認できます。</p>
+        </div>
+        <ul class="issue-list" id="issueList" hidden></ul>
+        <div class="status-metrics">
+          <div class="metric">
+            <span class="metric-label">総ステップ</span>
+            <span class="metric-value" id="metricSteps">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">ジェム</span>
+            <span class="metric-value" id="metricGems">0 / 0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">スイッチ</span>
+            <span class="metric-value" id="metricSwitches">0 / 0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">エラー</span>
+            <span class="metric-value" id="metricErrors">0</span>
+          </div>
+        </div>
+        <div class="status-actions">
+          <button type="submit" class="btn primary" id="runButton">検証を実行</button>
+          <button type="button" class="btn subtle" id="downloadReportButton">レポートを保存</button>
+        </div>
+      </section>
+    </form>
+
+    <section class="card stepper-card" id="stepperCard" aria-live="polite">
+      <header>
+        <div>
+          <h2>ステップ実行</h2>
+          <p class="description">1 コマンドずつ現在地を追跡しながらシミュレーションを確認できます。</p>
+        </div>
+        <span class="chip" id="stepCounterChip">0 コマンド</span>
+      </header>
+      <div class="stepper-status">
+        <strong id="stepStatusHeading">結果待機中</strong>
+        <p id="stepStatusMessage">「検証を実行」を押すとステップ実行が有効になります。</p>
+        <p id="stepDetailMessage" class="stepper-detail">ステップごとのメッセージがここに表示されます。</p>
+      </div>
+      <dl class="stepper-readout">
+        <div>
+          <dt>ステップ</dt>
+          <dd id="stepIndexLabel">--</dd>
+        </div>
+        <div>
+          <dt>位置</dt>
+          <dd id="stepPositionLabel">--</dd>
+        </div>
+        <div>
+          <dt>向き</dt>
+          <dd id="stepFacingLabel">--</dd>
+        </div>
+      </dl>
+      <div class="stepper-controls">
+        <button type="button" class="btn subtle" id="stepStartButton">最初から</button>
+        <button type="button" class="btn ghost" id="stepPrevButton">前へ</button>
+        <button type="button" class="btn primary" id="stepNextButton">次へ</button>
+        <button type="button" class="btn ghost" id="stepAutoButton">自動再生</button>
+      </div>
+    </section>
+
+    <section class="card map-card" aria-live="polite">
+      <header>
+        <h2>マッププレビュー</h2>
+        <p id="previewNote">マップを編集するとリアルタイムで更新されます。</p>
+      </header>
+      <div class="map-preview-grid">
+        <div id="mapCanvas" class="map-canvas" role="grid" aria-label="マップのプレビュー"></div>
+        <aside class="code-panel" id="codePanel">
+          <div class="code-panel-header">
+            <h3>実行中のコード</h3>
+            <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
+          </div>
+          <div class="code-panel-body" role="region" aria-live="polite">
+            <ol class="code-viewer-list" id="codeLineList"></ol>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="card log-card">
+      <header>
+        <h2>検証ログ</h2>
+        <div class="log-tools">
+          <button type="button" class="btn ghost" id="expandLogButton">展開</button>
+          <button type="button" class="btn ghost" id="collapseLogButton">折りたたむ</button>
         </div>
       </header>
+      <ol id="logList" class="log-list" aria-live="polite"></ol>
+    </section>
 
-      <form id="validatorForm" class="input-shell" novalidate>
-        <section class="panel-grid">
-          <article class="card input-card" data-card="map">
-            <header>
-              <div>
-                <h2>マップ入力</h2>
-                <p class="description">タブ区切りでマス目を定義します。空欄は通行可能な床を表します。</p>
-              </div>
-              <div class="field-tools">
-                <span class="chip" id="mapSizeChip" aria-live="polite">0 × 0</span>
-              </div>
-            </header>
-            <label class="field">
-              <span class="field-label">マップ</span>
-              <textarea id="mapInput" name="map" spellcheck="false" autocomplete="off" data-gramm="false" rows="12" placeholder="止	止	止	→			♦"></textarea>
-            </label>
-          </article>
+    <footer class="app-footer">
+      <p>© 2025 Swift Playground Toolkit. ローカルブラウザのみで動作し、入力データは保存されません。</p>
+    </footer>
+  </main>
 
-          <article class="card input-card" data-card="solution">
-            <header>
-              <div>
-                <h2>解答</h2>
-                <p class="description">1 行ごとに命令を書くか、`for` ループで繰り返しを表現できます。</p>
-              </div>
-              <div class="field-tools">
-                <span class="chip" id="commandCountChip" aria-live="polite">0 コマンド</span>
-              </div>
-            </header>
-            <label class="field">
-              <span class="field-label">Swift コード</span>
-              <textarea id="solutionInput" name="solution" spellcheck="false" autocomplete="off" data-gramm="false" rows="12" placeholder="moveForward()&#10;collectGem()"></textarea>
-            </label>
-          </article>
+  <noscript class="no-script">このアプリを利用するには JavaScript を有効にしてください。</noscript>
+  <script src="scripts/app.js" type="module"></script>
+</body>
 
-          <article class="card legend-card" aria-labelledby="legend-title">
-            <header>
-              <h2 id="legend-title">凡例</h2>
-            </header>
-            <dl class="legend-list">
-              <div><dt>止</dt><dd>通行不可ブロック</dd></div>
-              <div><dt>矢印</dt><dd>キャラクター初期位置と向き</dd></div>
-              <div><dt>♦</dt><dd>ジェム</dd></div>
-              <div><dt>〇 / ●</dt><dd>スイッチ（開 / 閉）</dd></div>
-              <div><dt>W1, W2 …</dt><dd>ワープポータル（同番号間で移動）</dd></div>
-              <div><dt>空欄</dt><dd>通行可能な床</dd></div>
-            </dl>
-          </article>
-        </section>
-
-        <section class="card status-card" id="statusCard" data-status="idle">
-          <div class="status-header">
-            <span class="status-pill" id="statusPill">未検証</span>
-            <time id="statusTimestamp" class="status-timestamp" aria-live="polite">--</time>
-          </div>
-          <div class="status-summary">
-            <h2 id="statusMessage">マップとコードを入力し、下の「検証を実行」を押してください。</h2>
-            <p id="statusDetails">サンプルデータを読み込むと動作イメージを確認できます。</p>
-          </div>
-          <ul class="issue-list" id="issueList" hidden></ul>
-          <div class="status-metrics">
-            <div class="metric">
-              <span class="metric-label">総ステップ</span>
-              <span class="metric-value" id="metricSteps">0</span>
-            </div>
-            <div class="metric">
-              <span class="metric-label">ジェム</span>
-              <span class="metric-value" id="metricGems">0 / 0</span>
-            </div>
-            <div class="metric">
-              <span class="metric-label">スイッチ</span>
-              <span class="metric-value" id="metricSwitches">0 / 0</span>
-            </div>
-            <div class="metric">
-              <span class="metric-label">エラー</span>
-              <span class="metric-value" id="metricErrors">0</span>
-            </div>
-          </div>
-          <div class="status-actions">
-            <button type="submit" class="btn primary" id="runButton">検証を実行</button>
-            <button type="button" class="btn subtle" id="downloadReportButton">レポートを保存</button>
-          </div>
-        </section>
-      </form>
-
-      <section class="card stepper-card" id="stepperCard" aria-live="polite">
-        <header>
-          <div>
-            <h2>ステップ実行</h2>
-            <p class="description">1 コマンドずつ現在地を追跡しながらシミュレーションを確認できます。</p>
-          </div>
-            <span class="chip" id="stepCounterChip">0 コマンド</span>
-        </header>
-        <div class="stepper-status">
-          <strong id="stepStatusHeading">結果待機中</strong>
-          <p id="stepStatusMessage">「検証を実行」を押すとステップ実行が有効になります。</p>
-          <p id="stepDetailMessage" class="stepper-detail">ステップごとのメッセージがここに表示されます。</p>
-        </div>
-        <dl class="stepper-readout">
-          <div>
-            <dt>ステップ</dt>
-            <dd id="stepIndexLabel">--</dd>
-          </div>
-          <div>
-            <dt>位置</dt>
-            <dd id="stepPositionLabel">--</dd>
-          </div>
-          <div>
-            <dt>向き</dt>
-            <dd id="stepFacingLabel">--</dd>
-          </div>
-        </dl>
-        <div class="stepper-controls">
-          <button type="button" class="btn subtle" id="stepStartButton">最初から</button>
-          <button type="button" class="btn ghost" id="stepPrevButton">前へ</button>
-          <button type="button" class="btn primary" id="stepNextButton">次へ</button>
-          <button type="button" class="btn ghost" id="stepAutoButton">自動再生</button>
-        </div>
-      </section>
-
-      <section class="card map-card" aria-live="polite">
-        <header>
-          <h2>マッププレビュー</h2>
-          <p id="previewNote">マップを編集するとリアルタイムで更新されます。</p>
-        </header>
-        <div class="map-preview-grid">
-          <div id="mapCanvas" class="map-canvas" role="grid" aria-label="マップのプレビュー"></div>
-          <aside class="code-panel" id="codePanel">
-            <div class="code-panel-header">
-              <h3>実行中のコード</h3>
-              <span class="code-panel-hint" id="codePanelHint">入力した Swift コードがここに表示されます。</span>
-            </div>
-            <div class="code-panel-body" role="region" aria-live="polite">
-              <ol class="code-viewer-list" id="codeLineList"></ol>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section class="card log-card">
-        <header>
-          <h2>検証ログ</h2>
-          <div class="log-tools">
-            <button type="button" class="btn ghost" id="expandLogButton">展開</button>
-            <button type="button" class="btn ghost" id="collapseLogButton">折りたたむ</button>
-          </div>
-        </header>
-        <ol id="logList" class="log-list" aria-live="polite"></ol>
-      </section>
-
-      <footer class="app-footer">
-        <p>© 2025 Swift Playground Toolkit. ローカルブラウザのみで動作し、入力データは保存されません。</p>
-      </footer>
-    </main>
-
-    <noscript class="no-script">このアプリを利用するには JavaScript を有効にしてください。</noscript>
-    <script src="scripts/app.js" type="module"></script>
-  </body>
 </html>

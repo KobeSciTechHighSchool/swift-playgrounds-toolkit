@@ -45,6 +45,25 @@ const legend = {
   arrows: ['↑', '↓', '←', '→'],
 };
 
+const directionEmojiGlyphs = {
+  up: '⬆️',
+  down: '⬇️',
+  left: '⬅️',
+  right: '➡️',
+};
+
+const mapCellIcons = {
+  wall: '🧱',
+  floor: '▫️',
+  gem: '💎',
+  switchOpen: '🟢',
+  switchClosed: '🔴',
+  warp: '🌀',
+  start: directionEmojiGlyphs,
+  actor: directionEmojiGlyphs,
+  unknown: '❔',
+};
+
 const SAMPLE_MAP = `止	止	止	→			♦
 止	止	止	止	止	止	W1
 止	止	止	止	止	W1	止
@@ -312,10 +331,10 @@ const startArrowToDirection = {
 };
 
 const directionToArrow = {
-  up: legend.arrows[0],
-  down: legend.arrows[1],
-  left: legend.arrows[2],
-  right: legend.arrows[3],
+  up: mapCellIcons.actor.up,
+  down: mapCellIcons.actor.down,
+  left: mapCellIcons.actor.left,
+  right: mapCellIcons.actor.right,
 };
 
 const directionLabels = {
@@ -323,6 +342,56 @@ const directionLabels = {
   down: '下',
   left: '左',
   right: '右',
+};
+
+const getCellDescription = (cell) => {
+  if (cell.isStart) {
+    return `スタート (${directionLabels[cell.direction] ?? '方向不明'})`;
+  }
+  if (cell.hasGem) {
+    return 'ジェム';
+  }
+  if (cell.switchState === 'open') {
+    return 'スイッチ（開）';
+  }
+  if (cell.switchState === 'closed') {
+    return 'スイッチ（閉）';
+  }
+  if (cell.warpId) {
+    return `ワープポータル W${cell.warpId}`;
+  }
+  if (cell.type === 'wall') {
+    return '通行不可ブロック';
+  }
+  if (cell.token && cell.token.trim()) {
+    return `カスタム記号: ${cell.token.trim()}`;
+  }
+  return '床';
+};
+
+const getCellIcon = (cell) => {
+  if (cell.isStart) {
+    return mapCellIcons.start[cell.direction] ?? mapCellIcons.unknown;
+  }
+  if (cell.hasGem) {
+    return mapCellIcons.gem;
+  }
+  if (cell.switchState === 'open') {
+    return mapCellIcons.switchOpen;
+  }
+  if (cell.switchState === 'closed') {
+    return mapCellIcons.switchClosed;
+  }
+  if (cell.warpId) {
+    return mapCellIcons.warp;
+  }
+  if (cell.type === 'wall') {
+    return mapCellIcons.wall;
+  }
+  if (cell.type === 'floor') {
+    return mapCellIcons.floor;
+  }
+  return mapCellIcons.unknown;
 };
 
 const statusLabels = {
@@ -390,8 +459,6 @@ const toRoman = (num) => {
 
   return result;
 };
-
-const sanitize = (value) => value.replace(/\t/g, '\t');
 
 const codeViewerState = {
   lines: [],
@@ -1346,11 +1413,14 @@ const renderMapPreview = (mapData, visitedPath = new Set(), activePosition = nul
       const cellElement = document.createElement('div');
       cellElement.classList.add('map-cell');
       cellElement.dataset.type = cell.type;
+      const description = getCellDescription(cell);
+      cellElement.setAttribute('role', 'gridcell');
+      cellElement.setAttribute('aria-label', description);
+      cellElement.title = description;
 
       if (cell.isStart) {
         cellElement.dataset.start = 'true';
         cellElement.dataset.direction = cell.direction;
-        cellElement.textContent = cell.token;
       } else if (cell.hasGem) {
         cellElement.dataset.gem = 'true';
       } else if (cell.switchState === 'open') {
@@ -1358,9 +1428,20 @@ const renderMapPreview = (mapData, visitedPath = new Set(), activePosition = nul
       } else if (cell.switchState === 'closed') {
         cellElement.dataset.switch = 'closed';
       } else if (cell.warpId) {
-        cellElement.dataset.warp = `W${cell.warpId}`;
-      } else if (cell.token && cell.token.trim()) {
-        cellElement.textContent = sanitize(cell.token);
+        cellElement.dataset.warp = String(cell.warpId);
+      }
+
+      const icon = getCellIcon(cell);
+      const iconElement = document.createElement('span');
+      iconElement.classList.add('map-cell__icon');
+      iconElement.textContent = icon;
+      cellElement.appendChild(iconElement);
+
+      if (cell.warpId) {
+        const badgeElement = document.createElement('span');
+        badgeElement.classList.add('map-cell__badge');
+        badgeElement.textContent = `W${cell.warpId}`;
+        cellElement.appendChild(badgeElement);
       }
 
       const key = `${cell.row},${cell.col}`;

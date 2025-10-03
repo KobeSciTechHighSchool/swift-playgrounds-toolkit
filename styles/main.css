@@ -253,12 +253,15 @@ textarea:focus {
 
 .legend-list div {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: minmax(0, 160px) 1fr;
   gap: 12px;
   align-items: center;
 }
 
 .legend-list dt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 700;
   color: var(--accent-strong);
 }
@@ -266,6 +269,25 @@ textarea:focus {
 .legend-list dd {
   margin: 0;
   color: var(--text-muted);
+}
+
+.legend-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  height: 2.2rem;
+  padding: 0 0.35rem;
+  border-radius: 12px;
+  background: rgba(108, 123, 255, 0.12);
+  font-size: 1.4rem;
+  box-shadow: inset 0 0 0 1px rgba(108, 123, 255, 0.2);
+}
+
+.legend-token {
+  font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .status-card {
@@ -441,7 +463,7 @@ textarea:focus {
 .map-canvas {
   --cols: 1;
   display: grid;
-  grid-template-columns: repeat(var(--cols), minmax(44px, 1fr));
+  grid-template-columns: repeat(var(--cols), minmax(52px, 1fr));
   gap: 8px;
   padding: 12px;
   border-radius: var(--radius-md);
@@ -454,64 +476,92 @@ textarea:focus {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 44px;
-  border-radius: 12px;
+  min-height: 48px;
+  border-radius: 14px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.06);
+  background: linear-gradient(145deg, rgba(88, 92, 140, 0.18), rgba(28, 31, 54, 0.42));
   color: var(--text-strong);
-  transition: transform var(--transition), background var(--transition);
+  transition: transform var(--transition), background var(--transition), box-shadow var(--transition);
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .map-cell[data-type="wall"] {
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.4));
-  color: rgba(255, 255, 255, 0.5);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  background: linear-gradient(135deg, rgba(74, 78, 112, 0.55), rgba(19, 20, 32, 0.85));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .map-cell[data-type="floor"] {
-  background: rgba(108, 123, 255, 0.08);
+  background: linear-gradient(160deg, rgba(108, 123, 255, 0.18), rgba(36, 41, 78, 0.26));
 }
 
-.map-cell[data-gem="true"]::after {
-  content: "♦";
-  font-size: 1.1rem;
-  color: #ffd166;
+.map-cell__icon {
+  font-size: 1.45rem;
+  line-height: 1;
+  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transform: translateZ(0);
+  transition: transform var(--transition), filter var(--transition), opacity var(--transition);
 }
 
-.map-cell[data-switch="closed"]::after {
-  content: "●";
-  color: #ff7b7b;
-  font-size: 1.1rem;
+.map-cell[data-gem="true"] .map-cell__icon {
+  filter: drop-shadow(0 0 14px rgba(255, 221, 102, 0.45));
 }
 
-.map-cell[data-switch="open"]::after {
-  content: "〇";
-  color: #6be0ff;
-  font-size: 1.1rem;
+.map-cell[data-switch="closed"] .map-cell__icon {
+  filter: drop-shadow(0 0 12px rgba(255, 107, 122, 0.55));
 }
 
-.map-cell[data-warp]::after {
-  content: attr(data-warp);
-  font-family: "JetBrains Mono", monospace;
-  color: #a389ff;
-  font-size: 0.95rem;
+.map-cell[data-switch="open"] .map-cell__icon {
+  filter: drop-shadow(0 0 12px rgba(107, 224, 255, 0.6));
+}
+
+.map-cell[data-warp] .map-cell__icon {
+  filter: drop-shadow(0 0 12px rgba(158, 168, 255, 0.55));
+}
+
+.map-cell__badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(9, 10, 19, 0.82);
+  color: var(--accent-strong);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(158, 168, 255, 0.28);
 }
 
 .map-cell[data-start="true"] {
   border: 2px solid rgba(111, 173, 255, 0.7);
-  box-shadow: 0 0 0 3px rgba(111, 173, 255, 0.18);
+  box-shadow: 0 0 0 3px rgba(111, 173, 255, 0.25), 0 10px 24px rgba(111, 173, 255, 0.18);
+}
+
+.map-cell[data-start="true"] .map-cell__icon {
+  filter: drop-shadow(0 0 14px rgba(111, 173, 255, 0.45));
 }
 
 .map-cell[data-path="true"] {
-  outline: 2px dashed rgba(108, 123, 255, 0.42);
-  background: rgba(108, 123, 255, 0.22);
+  outline: 2px dashed rgba(108, 123, 255, 0.35);
+  background: linear-gradient(160deg, rgba(108, 123, 255, 0.35), rgba(86, 99, 199, 0.18));
+}
+
+.map-cell[data-path="true"] .map-cell__icon {
+  opacity: 0.9;
 }
 
 .map-cell[data-active="true"] {
   border: 2px solid rgba(124, 140, 255, 0.75);
-  box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22), 0 12px 28px rgba(108, 123, 255, 0.22);
-  background: rgba(124, 140, 255, 0.4);
+  box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.28), 0 16px 32px rgba(108, 123, 255, 0.24);
+  background: linear-gradient(150deg, rgba(124, 140, 255, 0.48), rgba(70, 82, 170, 0.32));
   transform: translateY(-1px);
+}
+
+.map-cell[data-active="true"] .map-cell__icon {
+  transform: scale(1.08);
+  transition: transform var(--transition);
 }
 
 .map-cell[data-active="true"]::before {
@@ -519,16 +569,16 @@ textarea:focus {
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background: linear-gradient(135deg, #6c7bff, #8895ff);
   color: var(--text-inverse);
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  box-shadow: 0 8px 18px rgba(108, 123, 255, 0.25);
+  box-shadow: 0 10px 22px rgba(108, 123, 255, 0.28);
 }
 
 .code-panel {
@@ -743,6 +793,25 @@ textarea:focus {
   .map-canvas {
     background: rgba(255, 255, 255, 0.92);
     border: 1px solid rgba(12, 18, 34, 0.08);
+  }
+
+  .map-cell {
+    background: linear-gradient(140deg, rgba(96, 106, 210, 0.18), rgba(222, 226, 255, 0.85));
+    color: var(--text-strong);
+  }
+
+  .map-cell[data-type="floor"] {
+    background: linear-gradient(150deg, rgba(140, 149, 255, 0.18), rgba(238, 241, 255, 0.82));
+  }
+
+  .map-cell[data-type="wall"] {
+    background: linear-gradient(135deg, rgba(142, 145, 187, 0.35), rgba(204, 207, 239, 0.9));
+  }
+
+  .map-cell__badge {
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(76, 86, 200, 0.25);
+    color: var(--accent);
   }
 
   .code-panel {
