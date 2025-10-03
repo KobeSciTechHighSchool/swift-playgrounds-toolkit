@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark light;
   font-family: "Noto Sans JP", "Segoe UI", "Hiragino Sans", "Yu Gothic", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --topbar-height: 52px;
+  --topbar-height: 56px;
   --surface-0: rgba(15, 18, 29, 0.75);
   --surface-1: rgba(23, 27, 41, 0.85);
   --surface-2: rgba(37, 43, 62, 0.7);
@@ -148,7 +148,7 @@ body {
 
 /* Compact variant for buttons used in the top bar */
 .btn.small {
-  padding: 0.4rem 0.8rem;
+  padding: 0.34rem 0.7rem;
   font-size: 0.85rem;
 }
 
@@ -168,6 +168,32 @@ body {
   background: linear-gradient(180deg, rgba(15,18,29,0.92), rgba(15,18,29,0.86));
   border-bottom: 1px solid var(--border-color);
   backdrop-filter: saturate(140%) blur(14px);
+}
+
+/* Normalize controls inside fixed topbar to avoid full-height stretching and double borders */
+.topbar .btn,
+.topbar .status-header--button,
+.topbar .chip {
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+}
+
+.topbar .btn {
+  /* Simplify border look in tight header to avoid double-line feel */
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+.topbar .btn.ghost,
+.topbar .btn.subtle {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.topbar .status-header--button {
+  height: 36px;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .topbar__section {
@@ -217,6 +243,12 @@ body {
 .topbar__section--controls {
   justify-content: flex-end;
   gap: 8px;
+}
+
+.topbar__section--controls .btn {
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .input-shell {
@@ -425,7 +457,7 @@ textarea:focus {
   align-items: center;
   justify-content: center;
   min-width: 104px;
-  padding: 6px 16px;
+  padding: 4px 12px;
   border-radius: 999px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -451,7 +483,7 @@ textarea:focus {
 .status-header--button[data-status="error"] .status-pill { background: rgba(255, 107, 122, 0.18); color: var(--danger); }
 
 .status-timestamp {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.4);
 }
 
