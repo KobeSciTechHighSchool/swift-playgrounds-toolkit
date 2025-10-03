@@ -543,9 +543,26 @@ const splitLines = (value) => {
     .filter((line) => line.length > 0);
 };
 
-const parseMap = (mapText) => {
+const parseMap = (mapText, options = {}) => {
+  const {
+    allowMissingStart = false,
+    allowUnpairedPortals = false,
+    allowEmpty = false,
+  } = options;
+
   const rowsRaw = splitLines(mapText);
   if (!rowsRaw.length) {
+    if (allowEmpty) {
+      return {
+        grid: [],
+        rows: 0,
+        columns: 0,
+        start: null,
+        gems: new Set(),
+        switches: new Map(),
+        portals: new Map(),
+      };
+    }
     throw new Error('マップが空です。');
   }
 
@@ -606,12 +623,12 @@ const parseMap = (mapText) => {
     grid.push(gridRow);
   });
 
-  if (!startPosition) {
+  if (!startPosition && !allowMissingStart) {
     throw new Error('初期配置（↑↓←→のいずれか）がマップ内に必要です。');
   }
 
   portalGroups.forEach((positions, warpId) => {
-    if (positions.length !== 2) {
+    if (!allowUnpairedPortals && positions.length !== 2) {
       throw new Error(`ワープポータル W${warpId} は 2 箇所で指定してください（現在: ${positions.length} 箇所）。`);
     }
   });
@@ -625,6 +642,126 @@ const parseMap = (mapText) => {
     switches: switchPositions,
     portals: portalGroups,
   };
+};
+
+const MAP_TOKEN_CYCLE = ['', legend.stop, legend.gem, legend.switchOpen, legend.switchClosed, ...legend.arrows];
+
+const isStartToken = (token) => legend.arrows.includes(token);
+
+const mapEditorState = {
+  tokens: [],
+  rows: 0,
+  cols: 0,
+};
+
+const refreshMapEditorState = (mapData) => {
+  if (!mapData || !Array.isArray(mapData.grid)) {
+    mapEditorState.tokens = [];
+    mapEditorState.rows = 0;
+    mapEditorState.cols = 0;
+    return;
+  }
+
+  mapEditorState.rows = mapData.rows ?? mapData.grid.length ?? 0;
+  mapEditorState.cols = mapData.columns ?? (mapData.grid[0]?.length ?? 0);
+  mapEditorState.tokens = Array.from({ length: mapEditorState.rows }, (_, rowIndex) => {
+    const row = mapData.grid[rowIndex] ?? [];
+    return Array.from({ length: mapEditorState.cols }, (_, colIndex) => {
+      const cell = row[colIndex];
+      return cell?.token ?? '';
+    });
+  });
+};
+
+const serializeMapEditorTokens = () => {
+  if (!mapEditorState.rows || !mapEditorState.cols) {
+    return '';
+  }
+  return mapEditorState.tokens
+    .slice(0, mapEditorState.rows)
+    .map((rowTokens) => rowTokens.slice(0, mapEditorState.cols).join('\t'))
+    .join('\n');
+};
+
+const hasAnotherStart = (rowIndex, colIndex) => {
+  return mapEditorState.tokens.some((row, rIdx) =>
+    row.some((token, cIdx) => isStartToken(token) && (rIdx !== rowIndex || cIdx !== colIndex))
+  );
+};
+
+const computeNextToken = (currentToken) => {
+  if (/^W\d+$/u.test(currentToken ?? '')) {
+    return '';
+  }
+  const normalized = currentToken ?? '';
+  const currentIndex = MAP_TOKEN_CYCLE.indexOf(normalized);
+  if (currentIndex === -1) {
+    return MAP_TOKEN_CYCLE[0];
+  }
+  const nextIndex = (currentIndex + 1) % MAP_TOKEN_CYCLE.length;
+  return MAP_TOKEN_CYCLE[nextIndex];
+};
+
+const getNextTokenForCell = (rowIndex, colIndex) => {
+  const currentToken = mapEditorState.tokens[rowIndex]?.[colIndex] ?? '';
+  let nextToken = computeNextToken(currentToken);
+
+  if (!isStartToken(nextToken) && !hasAnotherStart(rowIndex, colIndex)) {
+    nextToken = legend.arrows[0];
+  }
+
+  return nextToken;
+};
+
+const ensureMapEditorState = () => {
+  if (mapEditorState.tokens.length) {
+    return;
+  }
+  try {
+    const mapData = parseMap(mapInput.value, {
+      allowMissingStart: true,
+      allowUnpairedPortals: true,
+      allowEmpty: true,
+    });
+    refreshMapEditorState(mapData);
+  } catch {
+    mapEditorState.tokens = [];
+    mapEditorState.rows = 0;
+    mapEditorState.cols = 0;
+  }
+};
+
+const handleMapCanvasClick = (event) => {
+  if (!mapCanvas || !mapInput) {
+    return;
+  }
+
+  const cellElement = event.target.closest('.map-cell');
+  if (!cellElement) {
+    return;
+  }
+
+  const rowIndex = Number.parseInt(cellElement.dataset.row ?? '', 10);
+  const colIndex = Number.parseInt(cellElement.dataset.col ?? '', 10);
+
+  if (Number.isNaN(rowIndex) || Number.isNaN(colIndex)) {
+    return;
+  }
+
+  ensureMapEditorState();
+  if (!mapEditorState.tokens[rowIndex] || mapEditorState.tokens[rowIndex][colIndex] == null) {
+    return;
+  }
+
+  const nextToken = getNextTokenForCell(rowIndex, colIndex);
+  if (nextToken === mapEditorState.tokens[rowIndex][colIndex]) {
+    return;
+  }
+
+  mapEditorState.tokens[rowIndex][colIndex] = nextToken;
+  const updatedText = serializeMapEditorTokens();
+  mapInput.value = updatedText;
+  mapInput.dispatchEvent(new window.Event('input', { bubbles: true }));
 };
 
 const preprocessSolutionTokens = (solutionText) => {
@@ -1403,8 +1540,13 @@ const simulateProgram = (mapData, program) => {
 
 const renderMapPreview = (mapData, visitedPath = new Set(), activePosition = null) => {
   if (!mapCanvas) return;
+  refreshMapEditorState(mapData);
   mapCanvas.textContent = '';
-  mapCanvas.style.setProperty('--cols', String(mapData.columns));
+  if (mapData.columns > 0) {
+    mapCanvas.style.setProperty('--cols', String(mapData.columns));
+  } else {
+    mapCanvas.style.removeProperty('--cols');
+  }
 
   const visitedSet = visitedPath instanceof Set ? visitedPath : new Set(visitedPath ?? []);
 
@@ -1413,6 +1555,8 @@ const renderMapPreview = (mapData, visitedPath = new Set(), activePosition = nul
       const cellElement = document.createElement('div');
       cellElement.classList.add('map-cell');
       cellElement.dataset.type = cell.type;
+      cellElement.dataset.row = String(cell.row);
+      cellElement.dataset.col = String(cell.col);
       const description = getCellDescription(cell);
       cellElement.setAttribute('role', 'gridcell');
       cellElement.setAttribute('aria-label', description);
@@ -1805,6 +1949,7 @@ const clearInputs = () => {
   previewNote.textContent = 'マップを編集するとリアルタイムで更新されます。';
   resetStepper();
   setCodePanelHint(DEFAULT_CODE_HINT);
+  refreshMapEditorState({ grid: [], rows: 0, columns: 0 });
 };
 
 const updateMapPreviewDebounced = (() => {
@@ -1816,12 +1961,18 @@ const updateMapPreviewDebounced = (() => {
     }
     timer = window.setTimeout(() => {
       try {
-        const mapData = parseMap(mapInput.value);
+        const mapData = parseMap(mapInput.value, {
+          allowMissingStart: true,
+          allowUnpairedPortals: true,
+          allowEmpty: true,
+        });
         setMapCounts(mapData);
         renderMapPreview(mapData);
       } catch {
         mapSizeChip.textContent = '— × —';
         mapCanvas.textContent = '';
+        mapCanvas.style.removeProperty('--cols');
+        refreshMapEditorState({ grid: [], rows: 0, columns: 0 });
       }
     }, 250);
   };
@@ -1880,6 +2031,7 @@ const init = () => {
 
   mapInput.addEventListener('input', updateMapPreviewDebounced);
   solutionInput.addEventListener('input', handleSolutionInputChange);
+  mapCanvas.addEventListener('click', handleMapCanvasClick);
 
   const form = document.querySelector('#validatorForm');
   form?.addEventListener('submit', (event) => {

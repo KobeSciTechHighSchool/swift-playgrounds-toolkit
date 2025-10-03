@@ -484,6 +484,8 @@ textarea:focus {
   transition: transform var(--transition), background var(--transition), box-shadow var(--transition);
   overflow: hidden;
   isolation: isolate;
+  cursor: pointer;
+  user-select: none;
 }
 
 .map-cell[data-type="wall"] {
