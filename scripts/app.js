@@ -1,6 +1,5 @@
 const mapInput = document.querySelector('#mapInput');
 const solutionInput = document.querySelector('#solutionInput');
-const mapSizeChip = document.querySelector('#mapSizeChip');
 const commandCountChip = document.querySelector('#commandCountChip');
 const mapCanvas = document.querySelector('#mapCanvas');
 const mapSizeForm = document.querySelector('#mapSizeForm');
@@ -1058,9 +1057,7 @@ const applyMapResize = (targetRows, targetCols) => {
   mapEditorState.tokens = resized;
   mapEditorState.rows = rows;
   mapEditorState.cols = cols;
-  if (mapSizeChip) {
-    mapSizeChip.textContent = `${rows} × ${cols}`;
-  }
+  // map size UI chip removed; UI updates handled elsewhere if needed.
 
   ensureAnyStartExists(0, 0);
   closeMapCellMenu();
@@ -2322,7 +2319,7 @@ const resetLog = () => {
 };
 
 const setMapCounts = (mapData) => {
-  mapSizeChip.textContent = `${mapData.rows} × ${mapData.columns}`;
+  // map size UI chip removed; nothing to update here.
 };
 
 const setCommandCount = (program) => {
@@ -2601,7 +2598,6 @@ const clearInputs = () => {
   }
   mapCanvas.textContent = '';
   mapCanvas.style.removeProperty('--cols');
-  mapSizeChip.textContent = '0 × 0';
   commandCountChip.textContent = '0 コマンド';
   resetLog();
   updateStatusCard('idle');
@@ -2630,7 +2626,7 @@ const updateMapPreviewDebounced = (() => {
         setMapCounts(mapData);
         renderMapPreview(mapData);
       } catch {
-        mapSizeChip.textContent = '— × —';
+  // map size UI chip removed; nothing to update here.
         mapCanvas.textContent = '';
         mapCanvas.style.removeProperty('--cols');
         refreshMapEditorState({ grid: [], rows: 0, columns: 0 });
@@ -2706,9 +2702,8 @@ const init = () => {
   if (
     !mapInput ||
     !solutionInput ||
-    !mapCanvas ||
-    !mapSizeChip ||
-    !commandCountChip ||
+  !mapCanvas ||
+  !commandCountChip ||
     !statusCard ||
     !statusPill ||
     !statusMessage ||
