@@ -836,6 +836,37 @@ const toggleLegend = () => {
   legendState.isOpen ? closeLegend() : openLegend();
 };
 
+// Status popover (opened from the topbar status header)
+const statusPopoverState = {
+  isOpen: false,
+};
+
+const openStatusPopover = () => {
+  if (!statusCard || !statusHeaderButton || statusPopoverState.isOpen) return;
+  statusCard.removeAttribute('hidden');
+  statusCard.setAttribute('data-open', 'true');
+  statusCard.setAttribute('aria-hidden', 'false');
+  statusHeaderButton.setAttribute('aria-expanded', 'true');
+  statusPopoverState.isOpen = true;
+};
+
+const closeStatusPopover = ({ restoreFocus = false } = {}) => {
+  if (!statusCard || !statusHeaderButton || !statusPopoverState.isOpen) return;
+  statusCard.setAttribute('hidden', '');
+  statusCard.removeAttribute('data-open');
+  statusCard.setAttribute('aria-hidden', 'true');
+  statusHeaderButton.setAttribute('aria-expanded', 'false');
+  statusPopoverState.isOpen = false;
+  if (restoreFocus) {
+    try { statusHeaderButton.focus({ preventScroll: true }); } catch { statusHeaderButton.focus(); }
+  }
+};
+
+const toggleStatusPopover = () => {
+  if (!statusCard || !statusHeaderButton) return;
+  statusPopoverState.isOpen ? closeStatusPopover() : openStatusPopover();
+};
+
 const focusFirstElementInMapModal = () => {
   if (!mapTextModalState.isOpen) {
     return;
